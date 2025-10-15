@@ -1,0 +1,325 @@
+﻿<Window x:Class="percentagToAmp.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:percentagToAmp"
+        mc:Ignorable="d"
+        Title="自動載入Recipe(PP) - uPro DSM" Height="600" Width="1050" Closing="Window_Closing">
+
+    <!-- 綁定 ViewModel -->
+    <Grid>
+        <TabControl>
+            <TabItem Header="主要">
+                <Grid Margin="12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Grid Grid.Row="0" Grid.ColumnSpan="3">
+                        <UniformGrid Rows="1" Columns="2">
+                            <TextBlock Margin="4"
+               HorizontalAlignment="Stretch"
+               Text="{Binding ConnectionStatusText}"
+               TextAlignment="Center"
+               Foreground="White" Visibility="Hidden">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Background" Value="Gray"/>
+                                        <!-- 預設顏色 -->
+
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ConnectionState}" Value="Selected">
+                                                <Setter Property="Background" Value="Green"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding ConnectionState}" Value="NotConnected">
+                                                <Setter Property="Background" Value="Red"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding ConnectionState}" Value="Connecting">
+                                                <Setter Property="Background" Value="Gray"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding ConnectionState}" Value="Connected">
+                                                <Setter Property="Background" Value="LightGreen"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <TextBlock Margin="4"
+               HorizontalAlignment="Stretch"
+               Text="{Binding ConnectionStatusText}"
+               TextAlignment="Center"
+               Foreground="White">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Background" Value="Gray"/>
+                                        <!-- 預設顏色 -->
+
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ConnectionState}" Value="Selected">
+                                                <Setter Property="Background" Value="Green"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding ConnectionState}" Value="NotConnected">
+                                                <Setter Property="Background" Value="Red"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding ConnectionState}" Value="Connecting">
+                                                <Setter Property="Background" Value="Gray"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding ConnectionState}" Value="Connected">
+                                                <Setter Property="Background" Value="LightGreen"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </UniformGrid>
+
+                    </Grid>
+
+                    <!-- 標題列 -->
+                    <Label Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" HorizontalAlignment="Center" Content="工單號碼"/>
+                    <Label Grid.Row="1" Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Center" Content="員工編號"/>
+
+                    <!-- 輸入列 -->
+                    <TextBox Grid.Row="2" Grid.Column="0" Margin="8,6" Height="28" VerticalContentAlignment="Center"
+             Text="{Binding WorkOrderNo, UpdateSourceTrigger=PropertyChanged,
+                            ValidatesOnNotifyDataErrors=True}" GotKeyboardFocus="Tb_GotKeyboardFocus" />
+
+                    <TextBox Grid.Row="2" Grid.Column="1" Margin="8,6" Height="28" VerticalContentAlignment="Center"
+             Text="{Binding EmployeeId, UpdateSourceTrigger=PropertyChanged,
+                            ValidatesOnNotifyDataErrors=True}" GotKeyboardFocus="Tb_GotKeyboardFocus" />
+
+                    <Button Grid.Row="1" Grid.Column="2" Margin="8,6" Height="32" Content="SECS 連線"
+            Command="{Binding SecsConnCommand}"/>
+
+                    <Button Grid.Row="2" Grid.Column="2" Margin="8,6" Height="32" Content="派送"
+            Command="{Binding DispatchCommand}"/>
+
+                    <Grid  Grid.Row="3" Grid.ColumnSpan="3">
+                        <ListBox ItemsSource="{Binding Logs}"
+                 local:ListBoxAutoScrollBehavior.AutoScroll="True"
+                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                 VirtualizingStackPanel.IsVirtualizing="True"
+                 VirtualizingStackPanel.VirtualizationMode="Recycling">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Message}" Foreground="{Binding Color}" />
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Grid>
+
+                </Grid>
+            </TabItem>
+            <TabItem Header="次要">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="14*"/>
+                        <ColumnDefinition Width="1*"/>
+                    </Grid.ColumnDefinitions>
+                    <GroupBox Header="產品資料" Grid.Column="0">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="4*"/>
+                                <RowDefinition Height="3*"/>
+                            </Grid.RowDefinitions>
+                            <Grid Grid.Row="0">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="1*"/>
+                                    <RowDefinition Height="4*"/>
+                                </Grid.RowDefinitions>
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <StackPanel Grid.Row="0" Orientation="Horizontal">
+                                        <Label  HorizontalAlignment="Center" VerticalAlignment="Center">料號:</Label>
+                                        <TextBox MinWidth="260" HorizontalAlignment="Center" VerticalAlignment="Center" Text="{Binding PartNumber}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="1" Orientation="Horizontal">
+                                        <Label HorizontalAlignment="Center" VerticalAlignment="Center">面積 A:</Label>
+                                        <TextBox MinWidth="60" HorizontalAlignment="Center" VerticalAlignment="Center" Text="{Binding AreaA}"
+                                                 PreviewTextInput="NumberBox_PreviewTextInput"
+                                                 PreviewKeyDown="NumberBox_PreviewKeyDown"
+                                                 DataObject.Pasting="NumberBox_Pasting"/>
+                                        <Label HorizontalAlignment="Center" VerticalAlignment="Center">dm²</Label>
+                                        <Label HorizontalAlignment="Center" VerticalAlignment="Center">面積 B:</Label >
+                                        <TextBox MinWidth="60" HorizontalAlignment="Center" VerticalAlignment="Center" Text="{Binding AreaB}"  
+                                                 PreviewTextInput="NumberBox_PreviewTextInput"
+                                                 PreviewKeyDown="NumberBox_PreviewKeyDown"
+                                                 DataObject.Pasting="NumberBox_Pasting"/>
+                                        <Label HorizontalAlignment="Center" VerticalAlignment="Center">dm²</Label>
+                                        <Label HorizontalAlignment="Center" VerticalAlignment="Center">總面積:</Label>
+                                        <TextBox MinWidth="60" HorizontalAlignment="Center" VerticalAlignment="Center" Text="{Binding AreaTotal, Mode=OneWay}" IsReadOnly="True" IsEnabled="false" 
+                                                 PreviewTextInput="NumberBox_PreviewTextInput"
+                                                 PreviewKeyDown="NumberBox_PreviewKeyDown"
+                                                 DataObject.Pasting="NumberBox_Pasting"/>
+                                        <Label HorizontalAlignment="Center" VerticalAlignment="Center">dm²</Label>
+                                    </StackPanel>
+                                </Grid>
+                                <GroupBox Grid.Row="1" Header="數據">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="*"/>
+                                            <RowDefinition Height="1.4*"/>
+                                        </Grid.RowDefinitions>
+                                        <UniformGrid Rows="2" Columns="8" FirstColumn="1">
+                                            <Label HorizontalContentAlignment="Center" Content="模式"/>
+                                            <Label HorizontalContentAlignment="Center" Content="A面電流&#10;密度(ASD)"/>
+                                            <Label HorizontalContentAlignment="Center" Content="B面電流&#10;密度(ASD)"/>
+                                            <Label HorizontalContentAlignment="Center" Content="A面電流&#10;設定(A)"/>
+                                            <Label HorizontalContentAlignment="Center" Content="B面電流&#10;設定(A)"/>
+                                            <Label HorizontalContentAlignment="Center" Content="電流保護&#10;百分比(%)"/>
+                                            <Label HorizontalContentAlignment="Center" Content="設定電鍍&#10;時間(秒)"/>
+                                            <Label VerticalContentAlignment="Center" HorizontalContentAlignment="Center" Content="9-13# 鍍銅(DC):"/>
+                                            <ComboBox IsReadOnly="True"  Margin="5,0" VerticalAlignment="Center" IsEnabled="False"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding CurrentDensityA}"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding CurrentDensityB}"/>
+                                            <TextBox IsReadOnly="True" Margin="5,0" VerticalAlignment="Center" Text="{Binding CurrentA, StringFormat=0.##, Mode=OneWay}" IsEnabled="False"/>
+                                            <TextBox IsReadOnly="True" Margin="5,0" VerticalAlignment="Center" Text="{Binding CurrentB, StringFormat=0.##, Mode=OneWay}" IsEnabled="False"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding CurrentProtectPercentage}"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding TotalPlateTime}"/>
+                                            
+                                        </UniformGrid>
+                                        <UniformGrid Grid.Row="1" Rows="5" Columns="11" FirstColumn="1">
+                                            <Label HorizontalContentAlignment="Center" Content="第1段"/>
+                                            <Label HorizontalContentAlignment="Center" Content="第2段"/>
+                                            <Label HorizontalContentAlignment="Center" Content="第3段"/>
+                                            <Label HorizontalContentAlignment="Center" Content="第4段"/>
+                                            <Label HorizontalContentAlignment="Center" Content="第5段"/>
+                                            <Label HorizontalContentAlignment="Center" Content="第6段"/>
+                                            <Label HorizontalContentAlignment="Center" Content="第7段"/>
+                                            <Label HorizontalContentAlignment="Center" Content="第8段"/>
+                                            <Label HorizontalContentAlignment="Center" Content="第9段"/>
+                                            <Label HorizontalContentAlignment="Center" Content="第10段"/>
+                                            <Label VerticalContentAlignment="Center" HorizontalContentAlignment="Center" Content="時間設定:"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding PlateTimeStep1}"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding PlateTimeStep2}"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding PlateTimeStep3}"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding PlateTimeStep4}"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding PlateTimeStep5}"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding PlateTimeStep6}"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding PlateTimeStep7}"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding PlateTimeStep8}"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding PlateTimeStep9}"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding PlateTimeStep10}"/>
+                                            <Label VerticalContentAlignment="Center" HorizontalContentAlignment="Center" Content="A輸出電流(A):"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding CurrentA1, StringFormat=0.##}"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding CurrentA2, StringFormat=0.##}"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding CurrentA3, StringFormat=0.##}"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding CurrentA4, StringFormat=0.##}"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding CurrentA5, StringFormat=0.##}"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding CurrentA6, StringFormat=0.##}"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding CurrentA7, StringFormat=0.##}"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding CurrentA8, StringFormat=0.##}"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding CurrentA9, StringFormat=0.##}"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding CurrentA10, StringFormat=0.##}"/>
+                                            <Label VerticalContentAlignment="Center" HorizontalContentAlignment="Center" Content="B輸出電流(A):"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding CurrentB1, StringFormat=0.##}"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding CurrentB2, StringFormat=0.##}"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding CurrentB3, StringFormat=0.##}"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding CurrentB4, StringFormat=0.##}"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding CurrentB5, StringFormat=0.##}"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding CurrentB6, StringFormat=0.##}"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding CurrentB7, StringFormat=0.##}"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding CurrentB8, StringFormat=0.##}"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding CurrentB9, StringFormat=0.##}"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding CurrentB10, StringFormat=0.##}"/>
+                                            <Label VerticalContentAlignment="Center" HorizontalContentAlignment="Center" Content="電流百分比:"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding CurrentPercentageStep1}" IsReadOnly="True" IsEnabled="False"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding CurrentPercentageStep2}" IsReadOnly="True" IsEnabled="False"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding CurrentPercentageStep3}" IsReadOnly="True" IsEnabled="False"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding CurrentPercentageStep4}" IsReadOnly="True" IsEnabled="False"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding CurrentPercentageStep5}" IsReadOnly="True" IsEnabled="False"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding CurrentPercentageStep6}" IsReadOnly="True" IsEnabled="False"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding CurrentPercentageStep7}" IsReadOnly="True" IsEnabled="False"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding CurrentPercentageStep8}" IsReadOnly="True" IsEnabled="False"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding CurrentPercentageStep9}" IsReadOnly="True" IsEnabled="False"/>
+                                            <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding CurrentPercentageStep10}" IsReadOnly="True" IsEnabled="False"/>
+                                        </UniformGrid>
+                                    </Grid>
+
+                                </GroupBox>
+
+                            </Grid>
+                            <GroupBox Grid.Row="1" Header="數據清單">
+                                <DataGrid x:Name="dg"
+                                          ItemsSource="{Binding Dt.DefaultView}"
+                                          AutoGenerateColumns="False"
+                                          IsReadOnly="True"
+                                          CanUserAddRows="False" 
+                                          RowBackground="White"                  
+                                          AlternationCount="2"
+                                          AlternatingRowBackground="#FFF5F7FA"
+                                          GridLinesVisibility="None"
+                                          MouseDoubleClick="dg_MouseDoubleClick" SelectionChanged="dg_SelectionChanged">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="料號" Binding="{Binding PartNumber}" />
+                                        <DataGridTextColumn Header="面積A" Binding="{Binding BoardLengh}" />
+                                        <DataGridTextColumn Header="面積B" Binding="{Binding BoardWidt}" />
+                                        
+                                        <DataGridTextColumn Header="A面電流密度" Binding="{Binding CurrentDensity1}" />
+                                        <DataGridTextColumn Header="B面電流密度" Binding="{Binding CurrentDensity2}" />
+                                        <DataGridTextColumn Header="A面設定電流" Binding="{Binding Current1, StringFormat=0.##}" />
+                                        <DataGridTextColumn Header="B面設定電流" Binding="{Binding Current2, StringFormat=0.##}" />
+                                        <DataGridTextColumn Header="電流保護(%)" Binding="{Binding WeakRate1}" />
+                                        <DataGridTextColumn Header="電鍍時間(秒)" Binding="{Binding PlateTime1}" />
+                                        <DataGridTextColumn Header="新增/修改時間" Binding="{Binding AddOrEditDateTime, StringFormat={}{0:yyyy-MM-dd HH:mm}}" />
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </GroupBox>
+                        </Grid>
+                    </GroupBox>
+                    <GroupBox Header="操作" Grid.Column="1">
+                        <StackPanel>
+                            <Button Content="添改" Margin="0,5" Command="{Binding AddRecordCommand}"/>
+                            <Button Content="修改" Margin="0,5" Visibility="Collapsed"/>
+                            <Button Content="刪除" Margin="0,5" Command="{Binding DeleteRecordCommand}"/>
+                        </StackPanel>
+                    </GroupBox>
+                </Grid>
+            </TabItem>
+            <TabItem Header="次次要">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="4*"/>
+                        <ColumnDefinition Width="3*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Margin="10,10,10,10">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Height="100">
+                            <TextBox TextWrapping="Wrap"
+                                     AcceptsReturn="True"
+                                     Text="{Binding EncodedText}"
+                                     VerticalScrollBarVisibility="Auto"
+                                     Margin="4"/>
+                        </ScrollViewer>
+                        <Button Content="轉換" Command="{Binding TextDecodeCommand}" Margin="4" />
+
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Height="150">
+                            <TextBox TextWrapping="Wrap"
+                                     IsReadOnly="True"
+                                     AcceptsReturn="True"
+                                     Text="{Binding DecodedText}"
+                                     VerticalScrollBarVisibility="Auto"
+                                     Margin="4"/>
+                        </ScrollViewer>
+                    </StackPanel>
+
+                </Grid>
+            </TabItem>
+        </TabControl>
+    </Grid>
+
+</Window>
