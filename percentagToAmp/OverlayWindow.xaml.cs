@@ -25,12 +25,23 @@ namespace percentagToAmp
         {
             InitializeComponent();
             // 跨多螢幕覆蓋整個虛擬桌面
-            Left = SystemParameters.VirtualScreenLeft;
-            Top = SystemParameters.VirtualScreenTop;
-            Width = SystemParameters.VirtualScreenWidth;
-            Height = SystemParameters.VirtualScreenHeight;
+            //Left = SystemParameters.VirtualScreenLeft;
+            //Top = SystemParameters.VirtualScreenTop;
+            //Width = SystemParameters.VirtualScreenWidth;
+            //Height = SystemParameters.VirtualScreenHeight;
 
+            //WC 2025/10/14 Modify 擋主螢幕中間即可
+            // 取得主螢幕的解析度
+            double screenWidth = SystemParameters.PrimaryScreenWidth;
+            double screenHeight = SystemParameters.PrimaryScreenHeight;
 
+            // 設定視窗大小
+            Width = 500;
+            Height = 300;
+
+            // 計算置中位置
+            Left = (screenWidth - Width) / 2;
+            Top = (screenHeight - Height) / 2;
         }
 
         const int GWL_EXSTYLE = -20;

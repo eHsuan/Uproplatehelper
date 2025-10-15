@@ -1,0 +1,169 @@
+﻿{
+	"Connection": {
+		"IpAddress": "192.168.1.80",
+		"Port": 5000
+	},
+	"SvidMappings": [
+		{
+			"Vid": 1000,
+			"Controls": [
+				"數據加載",
+				"[NAME:cmbLoadTankProcess]"
+			]
+		},
+		{
+			"Vid": 1001,
+			"Controls": [
+				"數據加載",
+				"[CLASS:Edit; INSTANCE:11]"
+			]
+		},
+		{
+			"Vid": 1002,
+			"Controls": [
+				"數據加載",
+				"[NAME:cmbProcessNumber]"
+			]
+		},
+		{
+			"Vid": 1003,
+			"Controls": [
+				"數據加載",
+				"[NAME:numLengh]"
+			]
+		},
+		{
+			"Vid": 1004,
+			"Controls": [
+				"數據加載",
+				"[NAME:numArea]"
+			]
+		},
+		{
+			"Vid": 1005,
+			"Controls": [
+				"數據加載",
+				"[NAME:txtFB1LotNumber]"
+			]
+		},
+		{
+			"Vid": 1006,
+			"Controls": [
+				"數據加載",
+				"[NAME:txtProcessName]"
+			]
+		},
+		{
+			"Vid": 1007,
+			"Controls": [
+				"數據加載",
+				"[NAME:numWidt]"
+			]
+		},
+		{
+			"Vid": 1008,
+			"Controls": [
+				"數據加載",
+				"[CLASS:WindowsForms10.EDIT.app.0.34f5582_r9_ad1; INSTANCE:147]"
+			]
+		},
+		{
+			"Vid": 1009,
+			"Controls": [
+				"數據加載",
+				"[NAME:cmbCcCv1]"
+			]
+		},
+		{
+			"Vid": 1010,
+			"Controls": [
+				"數據加載",
+				"[NAME:numCurrentDensity1]"
+			]
+		},
+		{
+			"Vid": 1011,
+			"Controls": [
+				"數據加載",
+				"[NAME:numCurrentDensity2]"
+			]
+		},
+		{
+			"Vid": 1012,
+			"Controls": [
+				"數據加載",
+				"[NAME:numCurrent1]"
+			]
+		},
+		{
+			"Vid": 1013,
+			"Controls": [
+				"數據加載",
+				"[NAME:numCurrent2]"
+			]
+		},
+		{
+			"Vid": 1014,
+			"Controls": [
+				"數據加載",
+				"[NAME:numWeakRate1]"
+			]
+		},
+		{
+			"Vid": 1015,
+			"Controls": [
+				"數據加載",
+				"[NAME:numPlateTime1]"
+			]
+		},
+		{
+			"Vid": 1016,
+			"Controls": [
+				"數據加載",
+				"[NAME:label104]"
+			]
+		},
+		{
+			"Vid": 1021,
+			"Controls": [
+				"[CLASS:WindowsForms10.Window.8.app.0.34f5582_r9_ad1]",
+				"WindowsForms10.Window.8.app.0.34f5582_r9_ad19"
+			]
+		},
+		{
+			"Vid": 1022,
+			"Controls": [
+				"[CLASS:WindowsForms10.Window.8.app.0.34f5582_r9_ad1]",
+				"WindowsForms10.Window.8.app.0.34f5582_r9_ad19"
+			]
+		},
+		{
+			"Vid": 10000,
+			"Controls": [
+				"數據加載",
+				"[NAME:btnClearCurrent]"
+			]
+		},
+		{
+			"Vid": 10001,
+			"Controls": [
+				"數據加載",
+				"[NAME:btnDataLoad]"
+			]
+		},
+		{
+			"Vid": 10002,
+			"Controls": [
+				"數據加載",
+				"[NAME:btnExit]"
+			]
+		},
+		{
+			"Vid": 10003,
+			"Controls": [
+				"[CLASS:WindowsForms10.Window.8.app.0.34f5582_r9_ad1]",
+				"WindowsForms10.Window.8.app.0.34f5582_r9_ad16"
+			]
+		}
+	]
+}

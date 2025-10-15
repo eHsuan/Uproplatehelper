@@ -7,9 +7,26 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <AssemblyVersion>1.1.1.31</AssemblyVersion>
-    <Platforms>AnyCPU;x86</Platforms>
+    <Platforms>AnyCPU;x86;x64</Platforms>
+
+    <!-- Icon 與 Manifest -->
     <ApplicationIcon>Hopstarter-Rounded-Square-Mac-Terminal.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+
+    <!-- 自包含設定 (可直接部署到無 .NET 環境) -->
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+
+    <!-- 目標 Runtime，請依需求改成 win-x64 或 win-x86 -->
+    <RuntimeIdentifier>win-x86</RuntimeIdentifier>
+
+    <!-- 指定使用的 Runtime 版本 -->
+    <RuntimeFrameworkVersion>8.0.19</RuntimeFrameworkVersion>
+    <WindowsDesktopTargetingPackVersion>8.0.19</WindowsDesktopTargetingPackVersion>
+
+    <!-- 可選：啟用裁剪減少體積（需測試穩定性） -->
+    <!-- <PublishTrimmed>true</PublishTrimmed> -->
   </PropertyGroup>
 
   <ItemGroup>

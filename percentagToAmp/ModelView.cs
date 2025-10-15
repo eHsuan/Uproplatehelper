@@ -21,6 +21,7 @@ using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Metadata.Ecma335;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -28,6 +29,7 @@ using System.Threading.Tasks;
 using System.Timers;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -36,7 +38,7 @@ using static percentagToAmp.Utility;
 
 namespace percentagToAmp.ViewModels
 {
-    
+
     /// <summary>
     /// ViewModel for: 自動載入Recipe(PP) - uPro DSM
     /// 綁定示例（XAML）：
@@ -55,6 +57,24 @@ namespace percentagToAmp.ViewModels
 
         private System.Timers.Timer S5F1_Timer;
         private System.Timers.Timer S6F1_Timer;
+
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct POINT
+        {
+            public int X;
+            public int Y;
+        }
+
+        [DllImport("user32.dll")]
+        private static extern bool GetCursorPos(out POINT lpPoint);
+
+        private System.Timers.Timer S6F1_CheckTimer;    //WC 2025/10/14 Add 每秒檢查滑鼠
+        private DateTime lastMouseMoveTime;
+        private POINT lastMousePos;
+        bool isStopTimer = false;
+        bool isReadyToStart = false;
+
         private readonly CancellationTokenSource _cts = new();
 
         // 是否忙碌；變化時會觸發 CanExecute 重新評估
@@ -814,9 +834,25 @@ namespace percentagToAmp.ViewModels
 
         static void SetOverlayClickThrough(bool enable)
         {
+            //Application.Current.Dispatcher.Invoke(() =>
+            //{
+            //    _overlay?.SetClickThrough(enable);
+            //});
+
+            //WC 2025/10/14 加入 try catch
+            if (Application.Current == null) return;
+
             Application.Current.Dispatcher.Invoke(() =>
             {
-                _overlay?.SetClickThrough(enable);
+                try
+                {
+                    _overlay?.SetClickThrough(enable);
+                }
+                catch (Exception ex)
+                {
+                    // 記錄 log，避免 UI thread crash
+                    CyntecLog.GeneralLogger.Error($"SetOverlayClickThrough error: {ex}");
+                }
             });
         }
 
@@ -828,6 +864,16 @@ namespace percentagToAmp.ViewModels
             S5F1_Timer.Interval = 1000 * 1;
             S5F1_Timer.Elapsed += S5F1_Timer_Elapsed;
             S5F1_Timer.Start();
+
+            // 初始化滑鼠位置
+            GetCursorPos(out lastMousePos);
+            lastMouseMoveTime = DateTime.Now;
+
+            // 每秒檢查滑鼠
+            S6F1_CheckTimer = new System.Timers.Timer(1000);
+            S6F1_CheckTimer.Elapsed += S6F1_CheckTimer_Elapsed;
+            S6F1_CheckTimer.AutoReset = true;
+            S6F1_CheckTimer.Start();
 
             S6F1_Timer = new System.Timers.Timer();
             S6F1_Timer.Elapsed += S6F1_Timer_Elapsed;
@@ -858,6 +904,10 @@ namespace percentagToAmp.ViewModels
                     objArray[index] = Item.A(JsonConvert.SerializeObject(dataGridBye));
                 }
 
+                //WC 測試 解碼用
+                //byte[] bytes = Convert.FromBase64String(FileContent);
+                //string ce = Encoding.UTF8.GetString(bytes);
+
                 var SecsMsg = new SecsMessage((byte)6, (byte)1)
                 {
                     Name = string.Empty,
@@ -872,7 +922,51 @@ namespace percentagToAmp.ViewModels
             }
             finally
             {
-                S6F1_Timer.Start();
+                if (!isStopTimer)
+                    S6F1_Timer.Start();
+            }
+        }
+
+        //WC 2025/10/14 Add 監控滑鼠事件，來停止 S6F1_Timer
+        private void S6F1_CheckTimer_Elapsed(object? sender, ElapsedEventArgs e)
+        {
+            const int MAX_WAIT_SEC = 60;
+
+            try
+            {
+                // 取得全螢幕滑鼠位置
+                GetCursorPos(out POINT currentPos);
+
+                if (currentPos.X != lastMousePos.X || currentPos.Y != lastMousePos.Y)
+                {
+                    // 滑鼠有移動
+                    lastMouseMoveTime = DateTime.Now;
+                    lastMousePos = currentPos;
+
+                    if (S6F1_Timer.Enabled && !isStopTimer)
+                    {
+                        isStopTimer = true;
+                        S6F1_Timer.Stop();
+                        CyntecLog.GeneralLogger.Debug("S6F1_Timer 停止 (因為滑鼠移動)");
+                    }
+                }
+                else
+                {
+                    // 滑鼠沒動
+                    if (isReadyToStart && (DateTime.Now - lastMouseMoveTime).TotalSeconds >= MAX_WAIT_SEC)
+                    {
+                        if (!S6F1_Timer.Enabled && isStopTimer)
+                        {
+                            isStopTimer = false;
+                            S6F1_Timer.Start();
+                            CyntecLog.GeneralLogger.Debug($"S6F1_Timer 啟動 (滑鼠靜止 {MAX_WAIT_SEC} 秒)");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                CyntecLog.GeneralLogger.Error($"S6F1_CheckTimer_Elapsed ex: {ex}");
             }
         }
 
@@ -933,7 +1027,7 @@ namespace percentagToAmp.ViewModels
             {
                 CyntecLog.GeneralLogger.Error($"S5F1 ex: {ex}");
             }
-            finally 
+            finally
             {
                 S5F1_Timer.Start();
             }
@@ -1055,7 +1149,7 @@ namespace percentagToAmp.ViewModels
 
                 // TODO: 在此呼叫你的 SECS/GEM 或後端服務
                 // 模擬耗時工作
-                await Task.Run(()=>{
+                await Task.Run(() => {
                     SecsConnection();
                 });
 
@@ -1069,7 +1163,7 @@ namespace percentagToAmp.ViewModels
             }
             finally
             {
-                
+
             }
         }
 
@@ -1117,7 +1211,7 @@ namespace percentagToAmp.ViewModels
             this._connector = new HsmsConnection(options, this._logger);
             this._connector.ConnectionChanged += _connector_ConnectionChanged;
             this._secsGem = new SecsGem(options, (ISecsConnection)this._connector, this._logger);
-            
+
             // Start the connector
 
             _cancellationTokenSource = new CancellationTokenSource();
@@ -1167,9 +1261,9 @@ namespace percentagToAmp.ViewModels
                                     CyntecLog.GeneralLogger.Trace("S2F41 recived");
                                     // Handle S2F41 PP_SELECT message
                                     //if ($"S{sStr3}F{fStr3}".Equals("S2F41") &&
-                                    if(primaryMessage.PrimaryMessage.SecsItem.Items[0].GetString().Trim().ToUpper().Equals("PP_SELECT"))
+                                    if (primaryMessage.PrimaryMessage.SecsItem.Items[0].GetString().Trim().ToUpper().Equals("PP_SELECT"))
                                     {
-                                        
+
                                         var 資料編號 = primaryMessage.PrimaryMessage.SecsItem.Items[1][0][0].GetString();
                                         var 批號 = primaryMessage.PrimaryMessage.SecsItem.Items[1][0][1].GetString();
                                         var 片數 = primaryMessage.PrimaryMessage.SecsItem.Items[1][0][2].GetString();
@@ -1202,7 +1296,7 @@ namespace percentagToAmp.ViewModels
                                             AutoItX.ControlClick("提示", "", "[CLASS:Button; INSTANCE:1]"); //popout - 確定  Thread.Sleep(500);
                                             SetOverlayClickThrough(false);
                                             Thread.Sleep(1500); //PLC清除需要時間
-                                            
+
                                             Utility.CaptureAllScreens($"S{sStr}F{fStr}", 4);
                                             #region 選到第一槽 001# 上下料
                                             {
@@ -1235,6 +1329,7 @@ namespace percentagToAmp.ViewModels
                                             //WinAuto.SetPartNumber(資料編號);
                                             Thread.Sleep(500);
                                             Utility.CaptureAllScreens($"S{sStr}F{fStr}", 7);
+
                                             AutoItX.Send("{ENTER}"); //必要
                                             Thread.Sleep(500);
                                             Utility.CaptureAllScreens($"S{sStr}F{fStr}", 8);
@@ -1268,11 +1363,11 @@ namespace percentagToAmp.ViewModels
                                                 }
                                             }
                                         }
-                                        catch(Exception ex)
+                                        catch (Exception ex)
                                         {
                                             CyntecLog.GeneralLogger.Error(ex);
                                         }
-                                        finally 
+                                        finally
                                         {
                                             HideOverlay();
                                             //確認是否有被正確寫入PLC
@@ -1374,7 +1469,9 @@ namespace percentagToAmp.ViewModels
                                 this._S2f23SvidInfo.Add(obj.GetString().Trim());
 
                             this.S6F1_Timer.Interval = Convert.ToInt32(SecsMsg.SecsItem.Items[1].GetString().Trim());
+                            //this.S6F1_Timer.Interval = 1000;    //WC 測試 需拿掉
                             this.S6F1_Timer.Enabled = true;
+                            isReadyToStart = true;
                         }
                         else
                         {
@@ -1488,7 +1585,7 @@ namespace percentagToAmp.ViewModels
                     HideOverlay();
                 }
 
-                
+
 
                 // 1022 DataGridView 處理
                 foreach (int key in group2)
@@ -1503,7 +1600,7 @@ namespace percentagToAmp.ViewModels
                             CloseIfExists("產品資料");
                         }
 
-                        KeyValuePair<bool, string> consoleProcessValue = GetConsoleProcessValue(@$"{AppDomain.CurrentDomain.BaseDirectory}\UIControl\_AutoCIMOrigin.exe", 
+                        KeyValuePair<bool, string> consoleProcessValue = GetConsoleProcessValue(@$"{AppDomain.CurrentDomain.BaseDirectory}\UIControl\_AutoCIMOrigin.exe",
                             string.Join(",", "GetDataGridView", Utility.Svid_Info[vid][0], Utility.Svid_Info[vid][1]));
                         if (consoleProcessValue.Key)
                         {
@@ -1526,7 +1623,7 @@ namespace percentagToAmp.ViewModels
                     {
                         if (key.Equals((int)Utility.VID.機台狀態))
                         {
-                            if ( false && _S5f1AlarmInfo.Count > 0)
+                            if (false && _S5f1AlarmInfo.Count > 0)
                             {
                                 //有任何 Alarm 加入 "ALARM" 跳脫;
                                 s1F3MachineValue.Add(ALARM);
@@ -1537,21 +1634,21 @@ namespace percentagToAmp.ViewModels
                                 CloseIfExists("數據加載");
                                 CloseIfExists("產品資料");
                             }
-                            KeyValuePair<bool, string> consoleProcessValue = GetConsoleProcessValue(@$"{AppDomain.CurrentDomain.BaseDirectory}\UIControl\_AutoCIMOrigin.exe", 
+                            KeyValuePair<bool, string> consoleProcessValue = GetConsoleProcessValue(@$"{AppDomain.CurrentDomain.BaseDirectory}\UIControl\_AutoCIMOrigin.exe",
                                 string.Join(",", "GetDataGridView", Utility.Svid_Info[vid][0], Utility.Svid_Info[vid][1]));
                             if (!consoleProcessValue.Key)
                             {
                                 s1F3MachineValue.Add(string.Empty);
                                 break;
                             }
-                            
+
                             var autoCimDataGridInfo2 = JsonConvert.DeserializeObject<AutoCIMDataGridInfo>(consoleProcessValue.Value);
                             if (!autoCimDataGridInfo2.Rtn_Result.Trim().ToUpper().Equals("TRUE"))
                             {
                                 s1F3MachineValue.Add(IDLE);
                                 break;
                             }
-                                
+
                             if (autoCimDataGridInfo2.Rtn_Value == null)
                             {
                                 s1F3MachineValue.Add(IDLE);
@@ -1561,7 +1658,7 @@ namespace percentagToAmp.ViewModels
                             if (autoCimDataGridInfo2.Rtn_Value.Count < 21) //槽位少於21
                             {
                                 s1F3MachineValue.Add(IDLE);
-                                break; 
+                                break;
                             }
 
                             //9~13槽
@@ -1569,7 +1666,7 @@ namespace percentagToAmp.ViewModels
                             {
                                 //col9 => 資料號. col10 => 批號 col11 => 數量 是否有任何資料 in cell
                                 if (autoCimDataGridInfo2.Rtn_Value[index].ContainsKey("Col9") &&
-                                    autoCimDataGridInfo2.Rtn_Value[index].ContainsKey("Col10") && 
+                                    autoCimDataGridInfo2.Rtn_Value[index].ContainsKey("Col10") &&
                                     autoCimDataGridInfo2.Rtn_Value[index].ContainsKey("Col11"))
                                 {
                                     if (!string.IsNullOrEmpty(autoCimDataGridInfo2.Rtn_Value[index]["Col9"]) &&
@@ -1598,7 +1695,7 @@ namespace percentagToAmp.ViewModels
             }
             return s1F3MachineValue;
         }
-        
+
         private sealed class SecsLogger : ISecsGemLogger
         {
             private readonly mainModelView _vm;      // ★ 取得實例
@@ -1613,7 +1710,7 @@ namespace percentagToAmp.ViewModels
             public void MessageIn(SecsMessage msg, int id)
             {
                 string msgStr = $"<-- [0x{id:X8}] {msg.ToSml()}";
-;                _vm.AddLog(msgStr, Brushes.Black);
+                ; _vm.AddLog(msgStr, Brushes.Black);
                 _logger.Trace(msgStr);
             }
 
@@ -1809,12 +1906,12 @@ namespace percentagToAmp.ViewModels
             if (!string.Equals(rtnResult?.Trim(), "True", StringComparison.OrdinalIgnoreCase))
                 return (SyncResult.Skipped, rtnMsg); // 例如 Win not exists
 
-            
+
             if (rtnValue.Count == 0)
             {
                 //沒有抓到的狀況
                 return (SyncResult.Skipped, rtnMsg);
-                
+
             }
             // 沒資料（只有表頭或完全無列）→ 清空
             if (rtnValue.Count <= 1)
@@ -1856,11 +1953,11 @@ namespace percentagToAmp.ViewModels
 
             // 刪除這次沒出現的舊 alarm（表示已消失）
             foreach (var existingId in _S5f1AlarmInfo.Keys.ToList())
-            if (!newIds.Contains(existingId))
-            {
-                _S5f1AlarmInfo.Remove(existingId);
-                changed++;
-            }
+                if (!newIds.Contains(existingId))
+                {
+                    _S5f1AlarmInfo.Remove(existingId);
+                    changed++;
+                }
 
             return (changed > 0 ? SyncResult.Updated : SyncResult.NoChange, rtnMsg);
         }
@@ -1882,7 +1979,7 @@ namespace percentagToAmp.ViewModels
                     try
                     {
                         string DateTimeStr = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-   
+
 
                         string sql = $@"
                                     UPDATE PartTable SET
@@ -1931,7 +2028,7 @@ namespace percentagToAmp.ViewModels
                     {
                         OperationAccessDataBase.CloseDataBase();
                     }
-                    
+
                 }
                 LoadDBToGD();
             }
