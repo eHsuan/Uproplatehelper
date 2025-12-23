@@ -1,4 +1,5 @@
-﻿using System.Collections.Specialized;
+﻿using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.Data;
 using System.Diagnostics;
 using System.Globalization;
@@ -22,6 +23,7 @@ namespace percentagToAmp
     public partial class MainWindow : Window
     {
         ViewModels.mainModelView mvm;
+
         public MainWindow()
         {
             InitializeComponent();
@@ -35,6 +37,36 @@ namespace percentagToAmp
             {
                 mvm.LoadDBToGD();
             }
+
+            ConfigMoveOut.LoadConfig();
+
+            //string workOrder = "2P25X04UP159";
+            //ConfigMoveOut.MoveOutInfos[workOrder] = new MoveOutInfo
+            //{
+            //    LotNo = workOrder,
+            //    NewLotNo = "2P25X04UP159#12_1_10",
+            //    Count = "10",
+            //    TargetNo = "#12",
+            //    LeftRack = "11",
+            //    RightRack = "10",
+            //    CurrentA = "5.0",
+            //    CurrentB = "7.0",
+            //    PlanTime = "3800",
+            //    LastExeTime = DateTime.Now
+            //};
+            //ConfigMoveOut.SaveConfig();
+
+            //MoveOutInfo moveOutInfo;
+            //if (ConfigMoveOut.MoveOutInfos.ContainsKey(workOrder))
+            //{
+            //    moveOutInfo = ConfigMoveOut.MoveOutInfos[workOrder];
+            //    moveOutInfo.SlotNo = "1";
+            //}
+            //else
+            //{
+            //    string msg = $"出站失敗! 工單號碼:{workOrder} 不存在於出站設定檔中!";
+            //    MessageBox.Show(msg);
+            //}
         }
 
         private void Tb_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
@@ -129,14 +161,14 @@ namespace percentagToAmp
 
 
                 double currentPercentageStep1 = drv.Row.IsNull("WeakRate2") ? 0.0 : Convert.ToDouble(drv.Row["WeakRate2"]);
-                double currentPercentageStep2  = drv.Row.IsNull("WeakRate3") ? 0.0 : Convert.ToDouble(drv.Row["WeakRate3"]);
-                double currentPercentageStep3  = drv.Row.IsNull("WeakRate4") ? 0.0 : Convert.ToDouble(drv.Row["WeakRate4"]);
-                double currentPercentageStep4  = drv.Row.IsNull("WeakRate5") ? 0.0 : Convert.ToDouble(drv.Row["WeakRate5"]);
-                double currentPercentageStep5  = drv.Row.IsNull("WeakRate6") ? 0.0 : Convert.ToDouble(drv.Row["WeakRate6"]);
-                double currentPercentageStep6  = drv.Row.IsNull("WeakRate7") ? 0.0 : Convert.ToDouble(drv.Row["WeakRate7"]);
-                double currentPercentageStep7  = drv.Row.IsNull("WeakRate8") ? 0.0 : Convert.ToDouble(drv.Row["WeakRate8"]);
-                double currentPercentageStep8  = drv.Row.IsNull("WeakRate9") ? 0.0 : Convert.ToDouble(drv.Row["WeakRate9"]);
-                double currentPercentageStep9  = drv.Row.IsNull("WeakRate10") ? 0.0 : Convert.ToDouble(drv.Row["WeakRate10"]);
+                double currentPercentageStep2 = drv.Row.IsNull("WeakRate3") ? 0.0 : Convert.ToDouble(drv.Row["WeakRate3"]);
+                double currentPercentageStep3 = drv.Row.IsNull("WeakRate4") ? 0.0 : Convert.ToDouble(drv.Row["WeakRate4"]);
+                double currentPercentageStep4 = drv.Row.IsNull("WeakRate5") ? 0.0 : Convert.ToDouble(drv.Row["WeakRate5"]);
+                double currentPercentageStep5 = drv.Row.IsNull("WeakRate6") ? 0.0 : Convert.ToDouble(drv.Row["WeakRate6"]);
+                double currentPercentageStep6 = drv.Row.IsNull("WeakRate7") ? 0.0 : Convert.ToDouble(drv.Row["WeakRate7"]);
+                double currentPercentageStep7 = drv.Row.IsNull("WeakRate8") ? 0.0 : Convert.ToDouble(drv.Row["WeakRate8"]);
+                double currentPercentageStep8 = drv.Row.IsNull("WeakRate9") ? 0.0 : Convert.ToDouble(drv.Row["WeakRate9"]);
+                double currentPercentageStep9 = drv.Row.IsNull("WeakRate10") ? 0.0 : Convert.ToDouble(drv.Row["WeakRate10"]);
                 double currentPercentageStep10 = drv.Row.IsNull("WeakRate11") ? 0.0 : Convert.ToDouble(drv.Row["WeakRate11"]);
 
                 // TODO: 你的處理
@@ -163,7 +195,7 @@ namespace percentagToAmp
                     vm.PlateTimeStep8 = plateTimeStep8;
                     vm.PlateTimeStep9 = plateTimeStep9;
                     vm.PlateTimeStep10 = plateTimeStep10;
-                    
+
 
                     vm.CurrentPercentageStep1 = currentPercentageStep1;
                     vm.CurrentPercentageStep2 = currentPercentageStep2;

@@ -16,12 +16,13 @@ namespace percentagToAmp
         {
             public const string MoveIn = "10001"; //Move IN MES定義
             public const string MachineStatus = "10002";
+            public const string MoveOut = "10003"; //WC 2025/12/09 Move Out 定義
         }
 
         private static class RptId
         {
-            public const string MoveIn = "100"; // 與你原碼一致
-            public const string MachineStatus = "101";
+            public const string MoveIn = "100"; // 與你原碼一致  //WC 2025/12/09 move out 使用一樣的RptID
+            public const string MachineStatus = "101";            
         }
 
         /// <summary>
@@ -73,6 +74,22 @@ namespace percentagToAmp
                             time: timeA,
                             ceid: Ceid.MachineStatus,
                             report: MakeReport(RptId.MachineStatus, new[] { status })
+                        );
+                        break;
+                    }
+
+                case "MOVE_OUT":
+                    {
+                        // 1) 先收集傳入參數 (注意：Dictionary 枚舉順序在 .NET Core 之後通常維持插入序，但規格上不保證。
+                        //    若順序很重要，建議呼叫端改傳「有序集合」或額外傳參數順序索引。)
+                        var values = (paramInfo?.Values ?? Array.Empty<string>()).ToList();
+
+                        //WC 2025/12/09 使用 Move In 一樣的機台資訊
+                        // 2) 報告: RPTID=100, 內容 = values 每個轉成 A
+                        payload = MakeS6F11Payload(
+                            time: timeA,
+                            ceid: Ceid.MoveOut,
+                            report: MakeReport(RptId.MoveIn, values)
                         );
                         break;
                     }

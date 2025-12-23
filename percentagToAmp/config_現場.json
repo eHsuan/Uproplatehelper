@@ -64,7 +64,7 @@
 			"Vid": 1008,
 			"Controls": [
 				"數據加載",
-				"[CLASS:WindowsForms10.EDIT.app.0.34f5582_r9_ad1; INSTANCE:147]"
+				"[CLASS:WindowsForms10.EDIT.app.0.34f5582_r7_ad1; INSTANCE:157]"
 			]
 		},
 		{
@@ -126,15 +126,15 @@
 		{
 			"Vid": 1021,
 			"Controls": [
-				"[CLASS:WindowsForms10.Window.8.app.0.34f5582_r9_ad1]",
-				"WindowsForms10.Window.8.app.0.34f5582_r9_ad19"
+				"[CLASS:WindowsForms10.Window.8.app.0.34f5582_r7_ad1]",
+				"WindowsForms10.Window.8.app.0.34f5582_r7_ad19"
 			]
 		},
 		{
 			"Vid": 1022,
 			"Controls": [
-				"[CLASS:WindowsForms10.Window.8.app.0.34f5582_r9_ad1]",
-				"WindowsForms10.Window.8.app.0.34f5582_r9_ad19"
+				"[CLASS:WindowsForms10.Window.8.app.0.34f5582_r7_ad1]",
+				"WindowsForms10.Window.8.app.0.34f5582_r7_ad19"
 			]
 		},
 		{
@@ -161,8 +161,8 @@
 		{
 			"Vid": 10003,
 			"Controls": [
-				"[CLASS:WindowsForms10.Window.8.app.0.34f5582_r9_ad1]",
-				"WindowsForms10.Window.8.app.0.34f5582_r9_ad16"
+				"[CLASS:WindowsForms10.Window.8.app.0.34f5582_r7_ad1]",
+				"WindowsForms10.Window.8.app.0.34f5582_r7_ad19"
 			]
 		}
 	]

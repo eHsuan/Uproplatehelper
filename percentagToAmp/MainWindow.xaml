@@ -16,15 +16,20 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="40*"/>
+                        <ColumnDefinition Width="187*"/>
+                        <ColumnDefinition Width="227*"/>
+                        <ColumnDefinition Width="113*"/>
+                        <ColumnDefinition Width="113*"/>
+                        <ColumnDefinition Width="113*"/>
+                        <ColumnDefinition Width="227*"/>
                     </Grid.ColumnDefinitions>
 
-                    <Grid Grid.Row="0" Grid.ColumnSpan="3">
+                    <Grid Grid.Row="0" Grid.ColumnSpan="7">
                         <UniformGrid Rows="1" Columns="2">
                             <TextBlock Margin="4"
                HorizontalAlignment="Stretch"
@@ -85,25 +90,61 @@
                     </Grid>
 
                     <!-- 標題列 -->
-                    <Label Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" HorizontalAlignment="Center" Content="工單號碼"/>
-                    <Label Grid.Row="1" Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Center" Content="員工編號"/>
+                    <Label Grid.Row="1" Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Left" Content="工單號碼&#10;หมายเลขคำสั่" Margin="38,0,0,0"/>
+                    <Label Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Center" Content="員工編號&#10;หมายเลขพนักงาน"/>
+                    <Label Grid.Row="1" Grid.Column="3" VerticalAlignment="Center" HorizontalAlignment="Center" Content="飛靶編號&#10;หมายเลขเป้า"/>
+                    <Label Grid.Row="1" Grid.Column="4" VerticalAlignment="Center" HorizontalAlignment="Center" Content="左掛架&#10;ขาตั้งซ้าย"/>
+                    <Label Grid.Row="1" Grid.Column="5" VerticalAlignment="Center" HorizontalAlignment="Center" Content="右掛架&#10;ขาตั้งขวา"/>
 
                     <!-- 輸入列 -->
-                    <TextBox Grid.Row="2" Grid.Column="0" Margin="8,6" Height="28" VerticalContentAlignment="Center"
+                    <TextBox Grid.Row="2" Grid.Column="0" Margin="8,8,8,8" Height="28" VerticalContentAlignment="Center"
              Text="{Binding WorkOrderNo, UpdateSourceTrigger=PropertyChanged,
-                            ValidatesOnNotifyDataErrors=True}" GotKeyboardFocus="Tb_GotKeyboardFocus" />
+                            ValidatesOnNotifyDataErrors=True}" GotKeyboardFocus="Tb_GotKeyboardFocus" Grid.ColumnSpan="2" />
 
-                    <TextBox Grid.Row="2" Grid.Column="1" Margin="8,6" Height="28" VerticalContentAlignment="Center"
+                    <TextBox Grid.Row="2" Grid.Column="2" Margin="8,8,8,8" Height="28" VerticalContentAlignment="Center"
              Text="{Binding EmployeeId, UpdateSourceTrigger=PropertyChanged,
                             ValidatesOnNotifyDataErrors=True}" GotKeyboardFocus="Tb_GotKeyboardFocus" />
 
-                    <Button Grid.Row="1" Grid.Column="2" Margin="8,6" Height="32" Content="SECS 連線"
+                    <TextBox Grid.Row="2" Grid.Column="3" Margin="8,8,8,8" Height="28" VerticalContentAlignment="Center"
+             Text="{Binding TargetNo, UpdateSourceTrigger=PropertyChanged,
+                            ValidatesOnNotifyDataErrors=True}" GotKeyboardFocus="Tb_GotKeyboardFocus" />
+
+                    <TextBox Grid.Row="2" Grid.Column="4" Margin="8,8,8,8" Height="28" VerticalContentAlignment="Center"
+             Text="{Binding LeftRack, UpdateSourceTrigger=PropertyChanged,
+                            ValidatesOnNotifyDataErrors=True}" GotKeyboardFocus="Tb_GotKeyboardFocus" />
+
+                    <TextBox Grid.Row="2" Grid.Column="5" Margin="8,8,8,8" Height="28" VerticalContentAlignment="Center"
+             Text="{Binding RightRack, UpdateSourceTrigger=PropertyChanged,
+                            ValidatesOnNotifyDataErrors=True}" GotKeyboardFocus="Tb_GotKeyboardFocus" />
+
+                    <TextBox Grid.Row="3" Grid.Column="0" Margin="8,8,8,8" Height="28" VerticalContentAlignment="Center"
+             Text="{Binding WorkOrderNoMoveOut, UpdateSourceTrigger=PropertyChanged,
+               ValidatesOnNotifyDataErrors=True}" GotKeyboardFocus="Tb_GotKeyboardFocus" Grid.ColumnSpan="2" />
+
+                    <TextBox Grid.Row="3" Grid.Column="2" Margin="8,8,8,8" Height="28" VerticalContentAlignment="Center"
+             Text="{Binding EmployeeIdMoveOut, UpdateSourceTrigger=PropertyChanged,
+               ValidatesOnNotifyDataErrors=True}" GotKeyboardFocus="Tb_GotKeyboardFocus" />
+
+                    <!--
+                    <Label Grid.Row="3" Grid.Column="3" VerticalAlignment="Center" HorizontalAlignment="Center" Content="槽位&#10;สล็อต"/>
+
+                    <ComboBox Grid.Row="3" Grid.Column="4" Margin="8,8,8,8" Height="28" VerticalContentAlignment="Center"
+            ItemsSource="{Binding SlotList}" SelectedItem="{Binding SlotNoMoveOut, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" 
+                              GotKeyboardFocus="Tb_GotKeyboardFocus" Grid.ColumnSpan="2"/> -->
+                    <!--<TextBox Grid.Row="3" Grid.Column="4" Margin="8,8,8,8" Height="28" VerticalContentAlignment="Center"
+             Text="{Binding SlotNoMoveOut, UpdateSourceTrigger=PropertyChanged,
+                ValidatesOnNotifyDataErrors=True}" GotKeyboardFocus="Tb_GotKeyboardFocus" Grid.ColumnSpan="2"/>-->
+
+                    <Button Grid.Row="1" Grid.Column="6" Margin="8,6,8,6" Height="32" Content="SECS 連線&#10;การเชื่อมต่อ SECS"
             Command="{Binding SecsConnCommand}"/>
 
-                    <Button Grid.Row="2" Grid.Column="2" Margin="8,6" Height="32" Content="派送"
+                    <Button Grid.Row="2" Grid.Column="6" Margin="8,6,8,6" Height="32" Content="派送&#10;การจัดส่ง"
             Command="{Binding DispatchCommand}"/>
 
-                    <Grid  Grid.Row="3" Grid.ColumnSpan="3">
+                    <Button Grid.Row="3" Grid.Column="6" Margin="8,6,8,6" Height="32" Content="出站&#10;การจัดส่ง"
+            Command="{Binding MoveOutCommand}"/>
+
+                    <Grid  Grid.Row="3" Grid.ColumnSpan="7" Margin="0,44,0,0" Grid.RowSpan="2">
                         <ListBox ItemsSource="{Binding Logs}"
                  local:ListBoxAutoScrollBehavior.AutoScroll="True"
                  ScrollViewer.VerticalScrollBarVisibility="Auto"
@@ -119,7 +160,7 @@
 
                 </Grid>
             </TabItem>
-            <TabItem Header="次要">
+            <TabItem Header="次要" Visibility="Hidden">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="14*"/>
@@ -188,7 +229,7 @@
                                             <TextBox IsReadOnly="True" Margin="5,0" VerticalAlignment="Center" Text="{Binding CurrentB, StringFormat=0.##, Mode=OneWay}" IsEnabled="False"/>
                                             <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding CurrentProtectPercentage}"/>
                                             <TextBox Margin="5,0" VerticalAlignment="Center" Text="{Binding TotalPlateTime}"/>
-                                            
+
                                         </UniformGrid>
                                         <UniformGrid Grid.Row="1" Rows="5" Columns="11" FirstColumn="1">
                                             <Label HorizontalContentAlignment="Center" Content="第1段"/>
@@ -266,7 +307,7 @@
                                         <DataGridTextColumn Header="料號" Binding="{Binding PartNumber}" />
                                         <DataGridTextColumn Header="面積A" Binding="{Binding BoardLengh}" />
                                         <DataGridTextColumn Header="面積B" Binding="{Binding BoardWidt}" />
-                                        
+
                                         <DataGridTextColumn Header="A面電流密度" Binding="{Binding CurrentDensity1}" />
                                         <DataGridTextColumn Header="B面電流密度" Binding="{Binding CurrentDensity2}" />
                                         <DataGridTextColumn Header="A面設定電流" Binding="{Binding Current1, StringFormat=0.##}" />
@@ -288,7 +329,7 @@
                     </GroupBox>
                 </Grid>
             </TabItem>
-            <TabItem Header="次次要">
+            <TabItem Header="次次要" Visibility="Hidden">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="4*"/>

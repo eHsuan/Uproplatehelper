@@ -33,7 +33,11 @@ namespace percentagToAmp
             {
                 FileName = "${basedir}/logs/general/${shortdate}.log",
                 Layout = "${longdate} | ${level:uppercase=true} | ${message} ${exception:format=tostring}",
-                Encoding = Encoding.UTF8
+                Encoding = Encoding.UTF8,
+
+                ArchiveEvery = FileArchivePeriod.Day,
+                MaxArchiveFiles = 30,
+                KeepFileOpen = false,
             };
             config.AddRule(LogLevel.Trace, LogLevel.Fatal, generalFile, "General*"); 
             // Rule：General* → 同時寫檔 & Console
@@ -43,7 +47,11 @@ namespace percentagToAmp
             {
                 FileName = "${basedir}/logs/secs/${shortdate}.log",
                 Layout = "${longdate} | ${level:uppercase=true} | ${message}",
-                Encoding = Encoding.UTF8
+                Encoding = Encoding.UTF8,
+
+                ArchiveEvery = FileArchivePeriod.Day,
+                MaxArchiveFiles = 30,
+                KeepFileOpen = false
             };
             // 這裡用 loggerNamePattern 過濾 → 只有名字以 "SECS" 開頭的 logger 才會寫進來
             config.AddRule(LogLevel.Trace, LogLevel.Fatal, secsFile, "SECS*");

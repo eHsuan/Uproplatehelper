@@ -1,4 +1,5 @@
-﻿using System;
+﻿using NLog;
+using System;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -37,6 +38,7 @@ namespace percentagToAmp
             var datetimestr = DateTime.Now.ToString("yyyyMMdd");
             string path = Path.Combine($"screenshot", $"{datetimestr}", $"{prefix}-{order:D2}-{DateTime.Now.ToString("yyyyMMddHHmmssffff")}.jpg");
             CaptureAllScreens(path);
+            DeleteOldFolders("screenshot", 30); //WC 2025/11/03 刪除根資料夾內大於30天的資料夾
         }
 
         public static void CaptureAllScreens(string path)
@@ -67,7 +69,7 @@ namespace percentagToAmp
                 bmp.Save(path, ImageFormat.Jpeg);
             }
             catch (Exception) { }
-        
+
         }
 
         public enum VID
@@ -191,7 +193,7 @@ namespace percentagToAmp
             //Svid_Info.Add(VID.退出, new List<string>() { DataLoad, "[NAME:btnExit]" });
             //Svid_Info.Add(VID.警告DGV, new List<string>() { "[CLASS:WindowsForms10.Window.8.app.0.34f5582_r7_ad1]", "WindowsForms10.Window.8.app.0.34f5582_r7_ad16" });
 
-            
+
 
         }
         public static bool 確認監控程式是否處於正常()
@@ -227,6 +229,48 @@ namespace percentagToAmp
 
         public static bool OperationAccessDataBaseFlag;
 
+        public static void DeleteOldFolders(string rootPath, int days = 30)
+        {
+            DirectoryInfo rootDir = new DirectoryInfo(rootPath);
+
+            if (!rootDir.Exists) return;
+
+            DateTime threshold = DateTime.Now.AddDays(-days);
+
+            foreach (var dir in rootDir.GetDirectories())
+            {
+                try
+                {
+                    if (dir.CreationTime < threshold)
+                    {
+                        dir.Delete(true); // true = 連同底下所有檔案、子資料夾一起刪                       
+                        CyntecLog.GeneralLogger.Trace($"刪除過期資料夾: {dir.FullName}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    CyntecLog.GeneralLogger.Trace($"刪除資料夾失敗: {dir.FullName}, {ex.Message}");
+                }
+            }
+        }       
+
+        public static string BinaryToString(string binary)
+        {
+            try
+            {
+                string[] parts = binary.Split(' ', (char)StringSplitOptions.RemoveEmptyEntries);
+
+                byte[] bytes = parts
+                    .Select(b => Convert.ToByte(b, 2))
+                    .ToArray();
+
+                return System.Text.Encoding.UTF8.GetString(bytes);
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
     }
 
     public class ControlInfo
@@ -375,7 +419,7 @@ namespace percentagToAmp
                 new AndCondition(
                     new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Window),
                     new PropertyCondition(AutomationElement.NameProperty, mainTitle)));
-            if (main == null) 
+            if (main == null)
                 throw new Exception("找不到主視窗");
 
             // 2) 在主視窗下找到 MDI 子窗（很多 WinForms 會把 MDI 子窗也標成 ControlType.Window 或 Pane）
@@ -393,14 +437,14 @@ namespace percentagToAmp
                         new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Pane),
                         new PropertyCondition(AutomationElement.NameProperty, mdiChildTitle)));
             }
-            if (childWin == null) 
+            if (childWin == null)
                 throw new Exception("找不到 MDI 子視窗");
 
             // 3) 在 MDI 子窗底下找 Grid（用 AutomationId 最穩）
             var grid = childWin.FindFirst(
                 TreeScope.Descendants,
                 new PropertyCondition(AutomationElement.AutomationIdProperty, gridAutomationId));
-            if (grid == null) 
+            if (grid == null)
                 throw new Exception("找不到 DataGridView");
 
 
@@ -435,7 +479,7 @@ namespace percentagToAmp
                 foreach (AutomationElement cell in cells)
                     row.Add(ReadCell(cell));
 
-                if (row.Count > 0) 
+                if (row.Count > 0)
                     result.Add(row);
             }
 
@@ -453,8 +497,8 @@ namespace percentagToAmp
                 if (el.TryGetCurrentPattern(TextPattern.Pattern, out var tp) && tp is TextPattern t)
                     return t.DocumentRange.GetText(int.MaxValue).TrimEnd('\r', '\n');
 
-               // if (el.TryGetCurrentPattern(LegacyIAccessiblePattern.Pattern, out var lp) && lp is LegacyIAccessiblePattern acc)
-               //     return acc.Current.Value ?? acc.Current.Name ?? "";
+                // if (el.TryGetCurrentPattern(LegacyIAccessiblePattern.Pattern, out var lp) && lp is LegacyIAccessiblePattern acc)
+                //     return acc.Current.Value ?? acc.Current.Name ?? "";
             }
             catch { /* ignore */ }
 

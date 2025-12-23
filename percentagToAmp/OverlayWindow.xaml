@@ -18,8 +18,13 @@
                 <TextBlock Text="正在自動控制，請勿操作滑鼠鍵盤"
                            FontSize="20" FontWeight="Bold"
                            HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                <TextBlock Text="กำลังควบคุมอัตโนมัติ กรุณาอย่าใช้เมาส์หรือคีย์บอร์ด"
+            FontSize="20" FontWeight="Bold"
+            HorizontalAlignment="Center" Margin="0,0,0,8"/>
                 <TextBlock Text="（約需數十秒）" Opacity="0.7"
                            HorizontalAlignment="Center"/>
+                <TextBlock Text="（ใช้เวลาประมาณไม่กี่สิบวินาที）" Opacity="0.7"
+           HorizontalAlignment="Center"/>
             </StackPanel>
         </Border>
     </Grid>

@@ -36,8 +36,8 @@ namespace percentagToAmp
             double screenHeight = SystemParameters.PrimaryScreenHeight;
 
             // 設定視窗大小
-            Width = 500;
-            Height = 300;
+            Width = 750;    //500
+            Height = 450;   //300
 
             // 計算置中位置
             Left = (screenWidth - Width) / 2;

@@ -35,6 +35,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using static Microsoft.Extensions.Logging.EventSource.LoggingEventSource;
 using static percentagToAmp.Utility;
+using ValidationResult = System.ComponentModel.DataAnnotations.ValidationResult;
 
 namespace percentagToAmp.ViewModels
 {
@@ -57,7 +58,7 @@ namespace percentagToAmp.ViewModels
 
         private System.Timers.Timer S5F1_Timer;
         private System.Timers.Timer S6F1_Timer;
-
+        private MessageBoxWindow? _messageBoxWindow;
 
         [StructLayout(LayoutKind.Sequential)]
         public struct POINT
@@ -82,6 +83,11 @@ namespace percentagToAmp.ViewModels
         [NotifyCanExecuteChangedFor(nameof(DispatchCommand))]
         private bool isBusy;
 
+        // 是否忙碌；變化時會觸發 CanExecute 重新評估
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(MoveOutCommand))]
+        private bool isBusyMoveOut;
+
         // 工單號碼
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(DispatchCommand))]
@@ -96,6 +102,53 @@ namespace percentagToAmp.ViewModels
         [RegularExpression(@"^[1-9][0-9]{5,}$", ErrorMessage = "員工編號格式不符")]
         private string employeeId = string.Empty;
 
+        // 飛靶編號     //WC 2025/11/03
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(DispatchCommand))]
+        [Required(ErrorMessage = "飛靶編號不可空白")]
+        [RegularExpression(@"^#[1-9][0-9]?$", ErrorMessage = "飛靶編號格式不符")]
+        private string targetNo = string.Empty;
+
+        // 左掛架
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(DispatchCommand))]
+        [Required(ErrorMessage = "左掛架不可空白")]
+        [RegularExpression(@"^[1-9][0-9]?$", ErrorMessage = "左掛架格式不符")]
+        private string leftRack = string.Empty;
+
+        // 右掛架
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(DispatchCommand))]
+        [Required(ErrorMessage = "右掛架不可空白")]
+        [RegularExpression(@"^[1-9][0-9]?$", ErrorMessage = "右掛架格式不符")]
+        private string rightRack = string.Empty;
+
+        // 工單號碼 MoveOut //WC 2025/12/09
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(MoveOutCommand))]
+        [Required(ErrorMessage = "工單號碼不可空白")]
+        [RegularExpression(@"^[A-Za-z0-9\-_.]{12}$", ErrorMessage = "工單格式不符")]
+        private string workOrderNoMoveOut = string.Empty;
+
+        // 員工編號 MoveOut
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(MoveOutCommand))]
+        [Required(ErrorMessage = "員工編號不可空白")]
+        [RegularExpression(@"^[1-9][0-9]{5,}$", ErrorMessage = "員工編號格式不符")]
+        private string employeeIdMoveOut = string.Empty;
+
+        //mark
+        //// 槽位編號 MoveOut
+        //[ObservableProperty]
+        //[NotifyCanExecuteChangedFor(nameof(MoveOutCommand))]
+        //[Required(ErrorMessage = "槽位編號不可空白")]
+        //[RegularExpression(@"^[1-9][0-9]?$", ErrorMessage = "槽位編號格式不符")]
+        //private string slotNoMoveOut = string.Empty;
+
+        //public ObservableCollection<int> SlotList { get; set; } = new ObservableCollection<int>(Enumerable.Range(9, 5));
+
+        //Dictionary<string, List<string>> _errors;
+        //private readonly Dictionary<string, List<ValidationResult>> _moveOutErrors = new();
 
         [ObservableProperty]
         private string encodedText = string.Empty;
@@ -1059,8 +1112,55 @@ namespace percentagToAmp.ViewModels
         partial void OnWorkOrderNoChanged(string value) => ValidateProperty(value, nameof(WorkOrderNo));
         partial void OnEmployeeIdChanged(string value) => ValidateProperty(value, nameof(EmployeeId));
 
+        //WC 2025/11/03
+        partial void OnTargetNoChanged(string value) => ValidateProperty(value, nameof(TargetNo));
+        partial void OnLeftRackChanged(string value) => ValidateProperty(value, nameof(LeftRack));
+        partial void OnRightRackChanged(string value) => ValidateProperty(value, nameof(RightRack));
+
+        //WC 2025/12/09 Add MoveOut
+        partial void OnWorkOrderNoMoveOutChanged(string value) => ValidateProperty(value, nameof(WorkOrderNoMoveOut));
+        partial void OnEmployeeIdMoveOutChanged(string value) => ValidateProperty(value, nameof(EmployeeIdMoveOut));
+
+        //mark
+        //partial void OnSlotNoMoveOutChanged(string value) => ValidateProperty(value, nameof(SlotNoMoveOut));
+
         // 判斷是否可派送：欄位都有效且非忙碌
-        private bool CanDispatch() => !IsBusy && !HasErrors && _connector?.State == Secs4Net.ConnectionState.Selected;
+        //private bool CanDispatch() => !IsBusy && !HasErrors && _connector?.State == Secs4Net.ConnectionState.Selected;
+        private bool CanDispatch() => !IsBusy && !DispatchHasErrors && _connector?.State == Secs4Net.ConnectionState.Selected;
+
+        private bool CanMoveOut() => !IsBusyMoveOut && !MoveOutHasErrors && _connector?.State == Secs4Net.ConnectionState.Selected;
+
+        //HasErrors 拆成兩個 HasErrors 的方法
+        public bool DispatchHasErrors => GetDispatchErrors().Any();
+
+        public bool MoveOutHasErrors => GetMoveOutErrors().Any();
+
+        private IEnumerable<ValidationResult> GetDispatchErrors()
+        {
+            // 重新驗證
+            ValidateProperty(WorkOrderNo, nameof(WorkOrderNo));
+            ValidateProperty(EmployeeId, nameof(EmployeeId));
+            ValidateProperty(TargetNo, nameof(TargetNo));
+            ValidateProperty(LeftRack, nameof(LeftRack));
+            ValidateProperty(RightRack, nameof(RightRack));
+
+            // 彙整錯誤 (只針對派送區域)
+            return GetErrors(nameof(WorkOrderNo)).Cast<ValidationResult>()
+                  .Concat(GetErrors(nameof(EmployeeId)).Cast<ValidationResult>())
+                  .Concat(GetErrors(nameof(TargetNo)).Cast<ValidationResult>())
+                  .Concat(GetErrors(nameof(LeftRack)).Cast<ValidationResult>())
+                  .Concat(GetErrors(nameof(RightRack)).Cast<ValidationResult>());
+        }
+
+        private IEnumerable<ValidationResult> GetMoveOutErrors()
+        {
+            ValidateProperty(WorkOrderNoMoveOut, nameof(WorkOrderNoMoveOut));
+            ValidateProperty(EmployeeIdMoveOut, nameof(EmployeeIdMoveOut));
+            //ValidateProperty(SlotNoMoveOut, nameof(SlotNoMoveOut)); //mark
+            return GetErrors(nameof(WorkOrderNoMoveOut)).Cast<ValidationResult>()
+                  .Concat(GetErrors(nameof(EmployeeIdMoveOut)).Cast<ValidationResult>());
+            //.Concat(GetErrors(nameof(SlotNoMoveOut)).Cast<ValidationResult>()); //mark
+        }
 
         // 派送（非同步）
         [RelayCommand(CanExecute = nameof(CanDispatch))]
@@ -1070,7 +1170,7 @@ namespace percentagToAmp.ViewModels
 
             // 再保險驗證一次
             ValidateAllProperties();
-            if (HasErrors) return;
+            if (DispatchHasErrors) return;
 
             try
             {
@@ -1107,7 +1207,63 @@ namespace percentagToAmp.ViewModels
                         { "remark04", ""} //預留
                     };
 
-                    CyntecLog.GeneralLogger.Debug($"S6F11, NOVE_IN, lotId: {lotId}, userId: {userId}");
+                    //============WC 2025/11/03 派送前將載入資料重置，避免人員使用到上次紀錄的 ==========================
+                    ShowOverlay();
+
+                    CyntecLog.GeneralLogger.Trace("S6F11 Send 1");
+                    {
+                        CloseIfExists("數據加載");
+                        CloseIfExists("產品資料");
+                    }
+
+                    // Activate window
+                    CyntecLog.GeneralLogger.Trace("clickDataLoad");
+                    WinAuto.clickDataLoad();
+                    Thread.Sleep(1500); //原程式本來開這頁就很久
+
+                    #region 選到第一槽 001# 上下料
+                    {
+                        string win = Utility.Svid_Info[Utility.VID.加載槽號][0]; // 或整個主視窗標題
+                        string comboId = Utility.Svid_Info[Utility.VID.加載槽號][1];// "[CLASS:WindowsForms10.COMBOBOX.app.0.34f5582_r7_ad1; INSTANCE:11]";
+
+                        AutoItX.WinActivate(win);
+                        AutoItX.WinWaitActive(win, "", 2);
+
+                        // 聚焦到 Combo
+                        AutoItX.ControlFocus(win, "", comboId);
+
+                        // 展開下拉
+                        AutoItX.ControlCommand(win, "", comboId, "ShowDropDown", "");
+
+                        // 選第一項（移到清單頂端）
+                        AutoItX.ControlSend(win, "", comboId, "{HOME}");
+                        AutoItX.ControlSend(win, "", comboId, "{ENTER}");
+                    }
+                    Thread.Sleep(500);
+                    #endregion
+
+                    // Click button
+                    SetOverlayClickThrough(true);
+                    AutoItX.ControlClick(Utility.Svid_Info[Utility.VID.清除當前][0], "", Utility.Svid_Info[Utility.VID.清除當前][1]);
+                    SetOverlayClickThrough(false);
+                    Thread.Sleep(500);
+
+                    Utility.CaptureAllScreens($"S6F11", 1);
+
+                    // Click prompt button
+                    SetOverlayClickThrough(true);
+                    AutoItX.ControlClick("提示", "", "[CLASS:Button; INSTANCE:1]"); //popout - 確定  Thread.Sleep(500);
+                    SetOverlayClickThrough(false);
+                    Thread.Sleep(1500); //PLC清除需要時間
+
+                    CyntecLog.GeneralLogger.Trace("S6F11 Send 2");
+                    {
+                        CloseIfExists("數據加載");
+                        CloseIfExists("產品資料");
+                    }
+                    //===========================================
+
+                    CyntecLog.GeneralLogger.Debug($"S6F11, MOVE_IN, lotId: {lotId}, userId: {userId}");
                     // 發送 S6F11 MOVE_IN //帶入批號, 工號
                     SecsMessage reply = await _secsGem.SendAsync(
                         SECSBuilder.BuildS6F11Message("MOVE_IN", paramInfo),
@@ -1134,6 +1290,126 @@ namespace percentagToAmp.ViewModels
             finally
             {
                 IsBusy = false;
+                HideOverlay();  //WC 2025/11/03 Add   
+            }
+        }
+
+        [RelayCommand(CanExecute = nameof(CanMoveOut))]
+        private async Task MoveOutAsync()
+        {
+            // 實際執行邏輯
+            ValidateAllProperties();
+            if (MoveOutHasErrors) return;
+
+            try
+            {
+                IsBusyMoveOut = true;
+
+                string workOrder = WorkOrderNoMoveOut.Trim();
+                string userId = EmployeeIdMoveOut.Trim();
+                //string slotNo = SlotNoMoveOut.Trim();   //mark
+
+                // 檢查 Secs 連線狀態
+                if (_secsGem == null || _connector == null || _connector.State != Secs4Net.ConnectionState.Selected)
+                {
+                    // 未連線狀態，不送 S6F11
+                    return;
+                }
+
+                try
+                {
+                    ShowOverlay();
+                 
+                    CyntecLog.GeneralLogger.Debug($"S6F11, MOVE_OUT, lotId: {workOrder}, userId: {userId}");
+
+                    //因為目前出站的管理項目已經不需要上報該參數了                    
+                    //MoveOutInfo moveOutInfo = new MoveOutInfo();
+                    //if (ConfigMoveOut.MoveOutInfos.ContainsKey(workOrder))
+                    //{
+                    //    moveOutInfo = ConfigMoveOut.MoveOutInfos[workOrder];
+                    //    //moveOutInfo.SlotNo = slotNo; //更新槽位
+                    //}
+                    //else
+                    //{
+                    //    string msg = $"出站失敗! 工單號碼:{workOrder} 不存在於出站設定檔中!";
+                    //    MessageBox.Show(msg);
+                    //    return;
+                    //}
+
+                    var paramInfo = new Dictionary<string, string>
+                    {
+                        { "LOTID", workOrder },
+                        { "USERID", userId },
+                        { "QRCODE_01", ""}, //預留
+                        { "QRCODE_02", ""},
+                        { "QRCODE_03", ""},
+                        { "QRCODE_04", ""},
+                        { "remark01", ""},
+                        { "remark02", ""},
+                        { "remark03", ""},
+                        { "remark04", ""} //預留
+                    };
+
+                    //var paramInfo = new Dictionary<string, string>
+                    //{
+                    //    { "LOTID", workOrder },
+                    //    { "USERID", userId },
+                    //    { "Count", moveOutInfo.Count},
+                    //    { "TargetNo", moveOutInfo.TargetNo},
+                    //    { "LeftRack", moveOutInfo.LeftRack},
+                    //    { "RightRack", moveOutInfo.RightRack},
+                    //    { "SlotNo", moveOutInfo.SlotNo},
+                    //    { "CurrentA", moveOutInfo.CurrentA},
+                    //    { "CurrentB", moveOutInfo.CurrentB},
+                    //    { "PlanTime", moveOutInfo.PlanTime}
+                    //};
+
+                    // WC 2025/12/09 Move Out 流程
+                    // 發送 S6F11 MOVE_OUT //帶入批號, 工號
+                    SecsMessage reply = await _secsGem.SendAsync(
+                        SECSBuilder.BuildS6F11Message("MOVE_OUT", paramInfo),
+                        _cancellationTokenSource.Token);
+
+                    // reply 內容可以處理或忽略
+                    //都只有OK，會透過 S10F3 來發錯誤資訊
+                    //if (reply != null)
+                    //{
+                    //    if (reply.Name == "MOVE_OUT")
+                    //    {
+                    //        Secs4Net.Item? Item = reply?.SecsItem;
+                    //        Memory<byte> mem = Item.GetMemory<byte>();
+                    //        byte[] bytes = mem.ToArray();
+
+                    //        if (bytes.Length > 0 && bytes[0] == 0x00)
+                    //        {
+                    //            CyntecLog.GeneralLogger.Trace($"MOVE_OUT OK,工單號碼: {workOrder}");
+                    //        }
+                    //        else
+                    //            CyntecLog.GeneralLogger.Trace($"MOVE_OUT NG,工單號碼: {workOrder}");
+                    //    }
+                    //}
+                }
+                catch (SecsException ex)
+                {
+                    CyntecLog.SecsLogger.Error(ex);
+
+                }
+            }
+            catch (OperationCanceledException ex)
+            {
+                CyntecLog.SecsLogger.Error(ex);
+                // 被取消
+            }
+            catch (Exception ex)
+            {
+                CyntecLog.SecsLogger.Error(ex);
+            }
+            finally
+            {
+                IsBusyMoveOut = false;
+                HideOverlay();  //WC 2025/11/03 Add   
+                //WorkOrderNoMoveOut = string.Empty;
+                //EmployeeIdMoveOut = string.Empty;                
             }
         }
         // 按鈕是否可用 (Command CanExecute)
@@ -1248,12 +1524,35 @@ namespace percentagToAmp.ViewModels
                             if (ReplyMsg != null && primaryMessage.PrimaryMessage.SecsItem != null)
                             {
                                 // Send reply
-
                                 if ($"S{sStr}F{fStr}".Equals("S10F3")) // 把Host Message show messagebox
                                 {
                                     // Handle S10F3 message
-                                    MessageBox.Show(primaryMessage.PrimaryMessage.SecsItem.Items[1].GetString());
-                                    _ = primaryMessage.TryReplyAsync(ReplyMsg, this._cancellationTokenSource.Token);
+                                    //MessageBox.Show(primaryMessage.PrimaryMessage.SecsItem.Items[1].GetString());
+                                    //_ = primaryMessage.TryReplyAsync(ReplyMsg, this._cancellationTokenSource.Token);
+                                  
+                                    // 傳送 S10F4 Reply
+                                    _ = primaryMessage.TryReplyAsync(ReplyMsg, _cancellationTokenSource.Token);
+
+                                    // 取得 Host 傳來的文字 (通常在 Items[1])
+                                    string errorMsg = primaryMessage.PrimaryMessage.SecsItem.Items[1].GetString();
+
+                                    errorMsg = BinaryToString(errorMsg);
+
+                                    if (string.IsNullOrEmpty(errorMsg))
+                                        errorMsg = "異常發生";
+
+                                    CyntecLog.GeneralLogger.Trace($"S10F3 :{errorMsg}");
+
+                                    Application.Current.Dispatcher.Invoke(() =>
+                                        {
+                                            if (_messageBoxWindow == null || !_messageBoxWindow.IsVisible)
+                                            {
+                                                _messageBoxWindow = new MessageBoxWindow();
+                                            }
+
+                                            _messageBoxWindow.UpdateMessage(errorMsg);
+                                        });
+
                                 }
                                 else if ($"S{sStr}F{fStr}".Equals("S2F41")) //應該做完才回
                                 {
@@ -1263,10 +1562,27 @@ namespace percentagToAmp.ViewModels
                                     //if ($"S{sStr3}F{fStr3}".Equals("S2F41") &&
                                     if (primaryMessage.PrimaryMessage.SecsItem.Items[0].GetString().Trim().ToUpper().Equals("PP_SELECT"))
                                     {
-
                                         var 資料編號 = primaryMessage.PrimaryMessage.SecsItem.Items[1][0][0].GetString();
                                         var 批號 = primaryMessage.PrimaryMessage.SecsItem.Items[1][0][1].GetString();
                                         var 片數 = primaryMessage.PrimaryMessage.SecsItem.Items[1][0][2].GetString();
+
+                                        //WC 2025/11/03 Add 處理 Lot 編號
+                                        string[] aryLot = 批號.Split('-');
+
+                                        // 若不足3個元素，就補足
+                                        if (aryLot.Length < 3)
+                                        {
+                                            var list = aryLot.ToList();
+                                            while (list.Count < 3)
+                                                list.Add(string.Empty);  // 可改成預設值，例如 "NA" 或 "0"
+
+                                            aryLot = list.ToArray();
+                                        }
+
+                                        aryLot[0] = aryLot[0] + $"{TargetNo}";
+                                        aryLot[1] = LeftRack;
+                                        aryLot[2] = RightRack;
+                                        string newLot = string.Join("-", aryLot);
 
                                         try
                                         {
@@ -1283,21 +1599,7 @@ namespace percentagToAmp.ViewModels
                                             Utility.CaptureAllScreens($"S{sStr}F{fStr}", 1);
                                             Thread.Sleep(1500); //原程式本來開這頁就很久
                                             Utility.CaptureAllScreens($"S{sStr}F{fStr}", 2);
-                                            //// Click button
 
-                                            SetOverlayClickThrough(true);
-                                            AutoItX.ControlClick(Utility.Svid_Info[Utility.VID.清除當前][0], "", Utility.Svid_Info[Utility.VID.清除當前][1]);
-                                            SetOverlayClickThrough(false);
-                                            Thread.Sleep(500);
-                                            Utility.CaptureAllScreens($"S{sStr}F{fStr}", 3);
-
-                                            SetOverlayClickThrough(true);
-                                            //// Click prompt button
-                                            AutoItX.ControlClick("提示", "", "[CLASS:Button; INSTANCE:1]"); //popout - 確定  Thread.Sleep(500);
-                                            SetOverlayClickThrough(false);
-                                            Thread.Sleep(1500); //PLC清除需要時間
-
-                                            Utility.CaptureAllScreens($"S{sStr}F{fStr}", 4);
                                             #region 選到第一槽 001# 上下料
                                             {
                                                 string win = Utility.Svid_Info[Utility.VID.加載槽號][0]; // 或整個主視窗標題
@@ -1320,32 +1622,46 @@ namespace percentagToAmp.ViewModels
                                             Utility.CaptureAllScreens($"S{sStr}F{fStr}", 5);
                                             #endregion
 
-                                            AutoItX.ControlSetText(Utility.Svid_Info[Utility.VID.批號][0], "", Utility.Svid_Info[Utility.VID.批號][1], 批號);
+                                            //AutoItX.ControlSetText(Utility.Svid_Info[Utility.VID.批號][0], "", Utility.Svid_Info[Utility.VID.批號][1], 批號);
+                                            AutoItX.ControlSetText(Utility.Svid_Info[Utility.VID.批號][0], "", Utility.Svid_Info[Utility.VID.批號][1], newLot);
                                             Thread.Sleep(500);
                                             Utility.CaptureAllScreens($"S{sStr}F{fStr}", 6);
 
                                             AutoItX.ControlFocus(Utility.Svid_Info[Utility.VID.資料編號][0], "", Utility.Svid_Info[Utility.VID.資料編號][1]);
                                             AutoItX.ControlSetText(Utility.Svid_Info[Utility.VID.資料編號][0], "", Utility.Svid_Info[Utility.VID.資料編號][1], 資料編號);
-                                            //WinAuto.SetPartNumber(資料編號);
+
                                             Thread.Sleep(500);
                                             Utility.CaptureAllScreens($"S{sStr}F{fStr}", 7);
 
                                             AutoItX.Send("{ENTER}"); //必要
                                             Thread.Sleep(500);
                                             Utility.CaptureAllScreens($"S{sStr}F{fStr}", 8);
+
                                             AutoItX.ControlSetText(Utility.Svid_Info[Utility.VID.數量][0], "", Utility.Svid_Info[Utility.VID.數量][1], 片數);
-                                            Thread.Sleep(500);
+                                            AutoItX.Send("{ENTER}");    //WC 2025/11/04 Issue 先輸入數量再 Enter
+                                            Thread.Sleep(1500);         //WC 2025/11/04 Issue 點擊太快，需要給系統載入時間 // Thread.Sleep(500);
                                             Utility.CaptureAllScreens($"S{sStr}F{fStr}", 9);
+
                                             SetOverlayClickThrough(true);
+
+                                            //mark
+                                            //抓取數值
+                                            //string SetCurrentA = AutoItX.ControlGetText(Utility.Svid_Info[Utility.VID.A面設定電流][0], "", Utility.Svid_Info[Utility.VID.A面設定電流][1]);
+                                            //string SetCurrentB = AutoItX.ControlGetText(Utility.Svid_Info[Utility.VID.B面設定電流][0], "", Utility.Svid_Info[Utility.VID.B面設定電流][1]);
+                                            //string SetPlanTime = AutoItX.ControlGetText(Utility.Svid_Info[Utility.VID.設定電鍍時間][0], "", Utility.Svid_Info[Utility.VID.設定電鍍時間][1]);
+                                            //Thread.Sleep(500);
+
                                             AutoItX.ControlClick(Utility.Svid_Info[Utility.VID.加載][0], "", Utility.Svid_Info[Utility.VID.加載][1]); //popout - 確定
-                                            //SetOverlayClickThrough(false);
                                             Thread.Sleep(500);
+
                                             Utility.CaptureAllScreens($"S{sStr}F{fStr}", 10);
-                                            //SetOverlayClickThrough(true);
-                                            AutoItX.ControlClick("提示", "", "[CLASS:Button; INSTANCE:1]"); //popout - 確定 
+
+                                            AutoItX.ControlClick("提示", "", "[CLASS:Button; INSTANCE:1]"); //popout - 確定
                                             SetOverlayClickThrough(false);
                                             Thread.Sleep(1500); //寫入PLC需要一點時間
+
                                             Utility.CaptureAllScreens($"S{sStr}F{fStr}", 11);
+
                                             SetOverlayClickThrough(true);
                                             AutoItX.ControlClick(Utility.Svid_Info[Utility.VID.退出][0], "", Utility.Svid_Info[Utility.VID.退出][1]); //popout - 確定  Thread.Sleep(500);
                                             SetOverlayClickThrough(false);
@@ -1355,11 +1671,28 @@ namespace percentagToAmp.ViewModels
 
                                                 if (JsonHelpers.TryGetPartAndLot(consoleProcessValue.Value, out var part, out var lot, targetKey: "001#", requireRtnResultTrue: true))
                                                 {
-                                                    if (string.Equals(資料編號, part) && lot.StartsWith(批號))
+                                                    //if (string.Equals(資料編號, part) && lot.StartsWith(批號))
+                                                    if (string.Equals(資料編號, part) && lot.StartsWith(newLot))
                                                     {
                                                         成功設定 = true;
+
+                                                        ConfigMoveOut.MoveOutInfos[WorkOrderNo] = new MoveOutInfo
+                                                        {
+                                                            LotNo = WorkOrderNo,
+                                                            NewLotNo = newLot,
+                                                            Count = 片數,
+                                                            TargetNo = TargetNo,
+                                                            LeftRack = LeftRack,
+                                                            RightRack = RightRack,
+                                                            //CurrentA = SetCurrentA,
+                                                            //CurrentB = SetCurrentB,
+                                                            //PlanTime = SetPlanTime,
+                                                            LastExeTime = DateTime.Now
+                                                        };
+                                                        ConfigMoveOut.SaveConfig();
                                                     }
-                                                    CyntecLog.GeneralLogger.Debug($"資料編號: {資料編號}, 批號: {批號}, 片數: {片數}, part: {part}, lot: {lot}, 成功設定: {成功設定}");
+                                                    //WC 2025/11/03 組合批號
+                                                    CyntecLog.GeneralLogger.Debug($"資料編號: {資料編號}, 批號: {批號}, 組合批號: {newLot}, 片數: {片數}, part: {part}, lot: {lot}, 設定: {成功設定}");
                                                 }
                                             }
                                         }
@@ -1374,7 +1707,12 @@ namespace percentagToAmp.ViewModels
                                             Application.Current.Dispatcher.Invoke(() =>
                                             ForegroundHelper.BringToFront(Application.Current.MainWindow));
 
-                                            if (!成功設定) MessageBox.Show("設定失敗!");
+                                            if (!成功設定)
+                                            {
+                                                //WC 2025/11/03 Add
+                                                CyntecLog.GeneralLogger.Debug($"資料編號: {資料編號}, 批號: {批號}, 組合批號: {newLot}, 片數: {片數}, 設定失敗: {成功設定}");
+                                                MessageBox.Show("設定失敗!");
+                                            }
 
                                             //把自己帶到前景
                                         }
@@ -1428,6 +1766,12 @@ namespace percentagToAmp.ViewModels
             {
                 DispatchCommand.NotifyCanExecuteChanged();
             }));
+
+            //WC 2025/12/09 Add
+            Application.Current.Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(() =>
+            {
+                MoveOutCommand.NotifyCanExecuteChanged();
+            }));
         }
 
         private List<string> _S2f23SvidInfo = new List<string>();
@@ -1469,7 +1813,6 @@ namespace percentagToAmp.ViewModels
                                 this._S2f23SvidInfo.Add(obj.GetString().Trim());
 
                             this.S6F1_Timer.Interval = Convert.ToInt32(SecsMsg.SecsItem.Items[1].GetString().Trim());
-                            //this.S6F1_Timer.Interval = 1000;    //WC 測試 需拿掉
                             this.S6F1_Timer.Enabled = true;
                             isReadyToStart = true;
                         }
@@ -1839,6 +2182,7 @@ namespace percentagToAmp.ViewModels
         {
             public byte[] FileContent { get; set; }
         }
+
         public void Dispose()
         {
             Debug.WriteLine("XXX");
