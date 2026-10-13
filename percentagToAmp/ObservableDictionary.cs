@@ -64,7 +64,7 @@ namespace percentagToAmp
         public void Clear()
         {
             _dict.Clear();
-            OnChanged?.Invoke("Clear", default, default);
+            //OnChanged?.Invoke("Clear", default, default); //WC 2026/05/07 不需要
         }
 
         public void Add(KeyValuePair<TKey, TValue> item) => AddOrUpdate(item.Key, item.Value);

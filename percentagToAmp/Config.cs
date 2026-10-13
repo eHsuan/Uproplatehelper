@@ -1,19 +1,24 @@
 ﻿using Newtonsoft.Json;
+using NLog.Config;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using static percentagToAmp.Utility;
-using System.IO;
 
 namespace percentagToAmp
 {
 
     public static class Config
     {
-        public static string IpAddress { get; private set; }
-        public static int Port { get; private set; }
+        public static string IpAddress { get; private set; } = string.Empty;
+        public static int Port { get; private set; } = 0;
+        public static string Factory { get; set; } = string.Empty;
+        public static string Floor { get; set; } = string.Empty;
+        public static string Area { get; set; } = string.Empty;
+        public static string EqpNo { get; set; } = string.Empty;
         public static string AccessDBPath { get; private set; }
         public static Dictionary<VID, List<string>> Svid_Info { get; private set; } = new Dictionary<VID, List<string>>();
 
@@ -25,6 +30,10 @@ namespace percentagToAmp
             // IP & Port
             IpAddress = config.Connection.IpAddress;
             Port = config.Connection.Port;
+            Factory = config.Connection.Factory;
+            Floor = config.Connection.Floor;
+            Area = config.Connection.Area;
+            EqpNo = config.Connection.EqpNo;
             AccessDBPath = config.Connection.AccessDBPath;
             Svid_Info.Clear();
             foreach (var map in config.SvidMappings)
@@ -40,9 +49,13 @@ namespace percentagToAmp
     }
     public class ConnectionConfig
     {
-        public string IpAddress { get; set; }
-        public int Port { get; set; }
-        public string AccessDBPath { get; set; }
+        public string IpAddress { get; set; } = string.Empty;
+        public int Port { get; set; } = 0;
+        public string Factory { get; set; } = string.Empty;
+        public string Floor { get; set; } = string.Empty;
+        public string Area { get; set; } = string.Empty;
+        public string EqpNo { get; set; } = string.Empty;
+        public string AccessDBPath { get; set; } = string.Empty;
     }
     public class SvidMapping
     {

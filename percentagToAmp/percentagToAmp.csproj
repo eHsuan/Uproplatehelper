@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
-    <AssemblyVersion>1.1.1.33</AssemblyVersion>
+    <AssemblyVersion>1.1.1.39</AssemblyVersion>
     <Platforms>AnyCPU;x86;x64</Platforms>
 
     <!-- Icon 與 Manifest -->
@@ -30,20 +30,40 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <COMReference Include="ActUtlTypeLib">
+      <WrapperTool>tlbimp</WrapperTool>
+      <VersionMinor>0</VersionMinor>
+      <VersionMajor>1</VersionMajor>
+      <Guid>d217e54e-4a26-4a76-b0ab-57166b90f9af</Guid>
+      <Lcid>0</Lcid>
+      <Isolated>false</Isolated>
+      <EmbedInteropTypes>true</EmbedInteropTypes>
+    </COMReference>
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Include="Hopstarter-Rounded-Square-Mac-Terminal.ico" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="AutoItX.NetCore" Version="3.3.16.1" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
+    <PackageReference Include="McProtocol" Version="1.2.5" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.8" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="9.0.8" />
+    <PackageReference Include="MQTTnet" Version="4.3.0.858" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="NLog" Version="6.0.3" />
     <PackageReference Include="Secs4Net" Version="2.4.4" />
     <PackageReference Include="Secs4Net.Sml" Version="2.4.4" />
     <PackageReference Include="System.Data.OleDb" Version="9.0.8" />
     <PackageReference Include="System.Drawing.Common" Version="9.0.8" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="CyntecMqttClient.NET8">
+      <HintPath>..\Dll\CyntecMqttClient.NET8.dll</HintPath>
+    </Reference>
   </ItemGroup>
 
 </Project>

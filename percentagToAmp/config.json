@@ -1,7 +1,11 @@
 ﻿{
 	"Connection": {
 		"IpAddress": "127.0.0.1",
-		"Port": 5000
+		"Port": 1883,
+		"Factory": "TN2",
+		"Floor": "Floor2",
+		"Area": "Yellow",
+		"EqpNo": "PL0084"
 	},
 	"SvidMappings": [
 		{
