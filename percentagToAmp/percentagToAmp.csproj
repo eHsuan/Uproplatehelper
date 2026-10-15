@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -30,18 +30,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <COMReference Include="ActUtlTypeLib">
-      <WrapperTool>tlbimp</WrapperTool>
-      <VersionMinor>0</VersionMinor>
-      <VersionMajor>1</VersionMajor>
-      <Guid>d217e54e-4a26-4a76-b0ab-57166b90f9af</Guid>
-      <Lcid>0</Lcid>
-      <Isolated>false</Isolated>
-      <EmbedInteropTypes>true</EmbedInteropTypes>
-    </COMReference>
-  </ItemGroup>
-
-  <ItemGroup>
     <Content Include="Hopstarter-Rounded-Square-Mac-Terminal.ico" />
   </ItemGroup>
 
@@ -63,6 +51,18 @@
   <ItemGroup>
     <Reference Include="CyntecMqttClient.NET8">
       <HintPath>..\Dll\CyntecMqttClient.NET8.dll</HintPath>
+    </Reference>
+    <Reference Include="Protocol.Drivers.Mitsubishi">
+      <HintPath>..\Dll\Protocol.Drivers.Mitsubishi\Protocol.Drivers.Mitsubishi.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="IoTClient">
+      <HintPath>..\Dll\Protocol.Drivers.Mitsubishi\IoTClient.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="System.IO.Ports">
+      <HintPath>..\Dll\Protocol.Drivers.Mitsubishi\System.IO.Ports.dll</HintPath>
+      <Private>true</Private>
     </Reference>
   </ItemGroup>
 
