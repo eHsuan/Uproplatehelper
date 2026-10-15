@@ -339,6 +339,10 @@ Uproplatehelper-main/
     "EqpNo": "PL0084",                          // 設備機台編號 (Equipment No)
     "AccessDBPath": "D:\\DMS\\Database\\DMS.mdb"// 機台 Access 資料庫檔案路徑
   },
+  "PlcConnection": {
+    "IpAddress": "192.168.1.2",                 // 三菱 Q 系列 PLC IP (MC Protocol TCP)
+    "Port": 5000                                // MC 協議通訊埠 (預設 5000)
+  },
   "SvidMappings": [
     {
       "Vid": 1000,                              // SVID / 控制項功能對應代碼

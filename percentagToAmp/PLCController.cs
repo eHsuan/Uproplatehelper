@@ -14,19 +14,15 @@ namespace percentagToAmp
     {
         public Mitsubishi.McProtocolTcp PLCTcp;
 
-        public PLCMcProtocol()
+        public PLCMcProtocol() : this(Config.PlcIpAddress, Config.PlcPort)
         {
-            PLCTcp = new Mitsubishi.McProtocolTcp("192.168.1.2", 5000, Mitsubishi.McFrame.MC3E);
-            PLCTcp.Open();
         }
 
-        //public int ReadD()
-        //{
-        //    int value = 0;
-        //    value = PLCTcp.GetDevice(Mitsubishi.PlcDeviceType.D, 2000);
-        //
-        //    return value;
-        //}
+        public PLCMcProtocol(string ip, int port)
+        {
+            PLCTcp = new Mitsubishi.McProtocolTcp(ip, port, Mitsubishi.McFrame.MC3E);
+            PLCTcp.Open();
+        }
 
         public async Task<int> ReadD(int address)
         {
@@ -41,13 +37,17 @@ namespace percentagToAmp
 
     /// <summary>
     /// PLC 控制器，基於 Protocol.Drivers.Mitsubishi (MC Protocol Qna-3E)
+    /// 連線參數預設自 config.json 載入
     /// </summary>
     public class PLCMXController : IDisposable
     {
         private McDriver plc;
         private readonly object _lock = new object();
-        private string _ip = "192.168.1.2";
-        private int _port = 5000;
+        private string? _customIp;
+        private int? _customPort;
+
+        public string Ip => _customIp ?? Config.PlcIpAddress;
+        public int Port => _customPort ?? Config.PlcPort;
 
         public bool IsConnected => plc?.IsConnected ?? false;
 
@@ -58,18 +58,21 @@ namespace percentagToAmp
 
         public PLCMXController(string ip, int port)
         {
-            _ip = ip;
-            _port = port;
+            _customIp = ip;
+            _customPort = port;
             plc = new McDriver();
         }
 
         /// <summary>
         /// 初始化 PLC 連線（MC 協議 TCP 連線）
         /// </summary>
-        public bool Initialize(string ip = "192.168.1.2", int port = 5000)
+        public bool Initialize(string? ip = null, int? port = null)
         {
-            _ip = ip;
-            _port = port;
+            if (!string.IsNullOrEmpty(ip))
+                _customIp = ip;
+            if (port.HasValue && port.Value > 0)
+                _customPort = port.Value;
+
             return EnsureConnected();
         }
 
@@ -102,12 +105,15 @@ namespace percentagToAmp
                     if (plc == null)
                         plc = new McDriver();
 
-                    bool connected = plc.ConnectAsync(_ip, _port).GetAwaiter().GetResult();
+                    string targetIp = Ip;
+                    int targetPort = Port;
+
+                    bool connected = plc.ConnectAsync(targetIp, targetPort).GetAwaiter().GetResult();
 
                     if (connected)
-                        CyntecLog.GeneralLogger.Info($"PLC Reconnect Success ({_ip}:{_port})");
+                        CyntecLog.GeneralLogger.Info($"PLC Reconnect Success ({targetIp}:{targetPort})");
                     else
-                        CyntecLog.GeneralLogger.Warn($"PLC Reconnect Fail ({_ip}:{_port})");
+                        CyntecLog.GeneralLogger.Warn($"PLC Reconnect Fail ({targetIp}:{targetPort})");
 
                     return connected;
                 }

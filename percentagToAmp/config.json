@@ -1,4 +1,4 @@
-﻿{
+{
 	"Connection": {
 		"IpAddress": "127.0.0.1",
 		"Port": 1883,
@@ -6,6 +6,10 @@
 		"Floor": "Floor2",
 		"Area": "Yellow",
 		"EqpNo": "PL0084"
+	},
+	"PlcConnection": {
+		"IpAddress": "192.168.1.2",
+		"Port": 5000
 	},
 	"SvidMappings": [
 		{
