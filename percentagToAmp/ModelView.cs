@@ -1034,12 +1034,7 @@ namespace percentagToAmp.ViewModels
                     CyntecLog.GeneralLogger.Trace($"[TraceData] StatusChangeReport Published Old={oldStatus}, New={machineStatus}");
                 }
 
-                var processDataList = new List<ProcessDataParameter>
-                {
-                    new ProcessDataParameter { Parameter = "1022", Value = rawDataGridJson },
-                    new ProcessDataParameter { Parameter = "1021", Value = machineStatus },
-                    new ProcessDataParameter { Parameter = "1046", Value = waterConsumption }
-                };
+                var processDataList = BuildProcessDataParameters(rawDataGridJson, waterConsumption);
 
                 var processDataReq = new ProcessDataReportRequest
                 {
@@ -1051,7 +1046,7 @@ namespace percentagToAmp.ViewModels
                 };
 
                 await _mqtt.PublishReportAsync(processDataReq);
-                CyntecLog.GeneralLogger.Trace($"[TraceData] ProcessDataReport Published TransactionID={processDataReq.TransactionID}, Status={machineStatus}, Water={waterConsumption}");
+                CyntecLog.GeneralLogger.Trace($"[TraceData] ProcessDataReport Published TransactionID={processDataReq.TransactionID}, Status={machineStatus}, Water={waterConsumption}, ParamCount={processDataList.Count}");
             }
             catch (OperationCanceledException)
             {
@@ -1066,6 +1061,100 @@ namespace percentagToAmp.ViewModels
             {
                 S6F1Lock.Release();
             }
+        }
+
+        /// <summary>
+        /// 將 DataGridView 原始 JSON 與 PLC 用水量拆解為新版 EAP ProcessDataReport 所需之中文參數清單。
+        /// 對應舊版 EAP CyntecMES.CreatParamDT 的槽位與欄位規則。
+        /// </summary>
+        private static List<ProcessDataParameter> BuildProcessDataParameters(string rawDataGridJson, string waterConsumption)
+        {
+            var processDataList = new List<ProcessDataParameter>();
+
+            if (!string.IsNullOrWhiteSpace(rawDataGridJson))
+            {
+                try
+                {
+                    var dataGridInfo = JsonConvert.DeserializeObject<AutoCIMDataGridInfo>(rawDataGridJson);
+                    if (dataGridInfo?.Rtn_Value != null)
+                    {
+                        foreach (var row in dataGridInfo.Rtn_Value)
+                        {
+                            if (row == null || !row.TryGetValue("Col1", out string? rawTankId) || string.IsNullOrWhiteSpace(rawTankId))
+                                continue;
+
+                            string tankId = rawTankId.Trim();
+                            switch (tankId)
+                            {
+                                case "005#":
+                                    processDataList.Add(new ProcessDataParameter { Parameter = "熱水洗#5-溫度", Value = ExtractTemperature(row) });
+                                    break;
+                                case "016#":
+                                    processDataList.Add(new ProcessDataParameter { Parameter = "酸洗#16-溫度", Value = ExtractTemperature(row) });
+                                    break;
+                                case "019#":
+                                    processDataList.Add(new ProcessDataParameter { Parameter = "熱水洗#19-溫度", Value = ExtractTemperature(row) });
+                                    break;
+                                case "020#":
+                                    processDataList.Add(new ProcessDataParameter { Parameter = "酸脫#20-溫度", Value = ExtractTemperature(row) });
+                                    break;
+                                case "009#":
+                                case "010#":
+                                case "011#":
+                                case "012#":
+                                case "013#":
+                                    string tankNo = tankId.TrimEnd('#').TrimStart('0');
+                                    var (currentA, voltageA) = ParseCurrentVoltage(row, "Col15");
+                                    var (currentB, voltageB) = ParseCurrentVoltage(row, "Col17");
+                                    string temperature = ExtractTemperature(row);
+
+                                    processDataList.Add(new ProcessDataParameter { Parameter = $"鍍銅#{tankNo}-A面-電流", Value = currentA });
+                                    processDataList.Add(new ProcessDataParameter { Parameter = $"鍍銅#{tankNo}-B面-電流", Value = currentB });
+                                    processDataList.Add(new ProcessDataParameter { Parameter = $"鍍銅#{tankNo}-A面-電壓", Value = voltageA });
+                                    processDataList.Add(new ProcessDataParameter { Parameter = $"鍍銅#{tankNo}-B面-電壓", Value = voltageB });
+                                    processDataList.Add(new ProcessDataParameter { Parameter = $"鍍銅#{tankNo}-溫度", Value = temperature });
+                                    break;
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    CyntecLog.GeneralLogger.Error($"[TraceData] 解析 DataGridView JSON 拆解製程參數失敗: {ex}");
+                }
+            }
+
+            // 固定附加 PLC 用水量 (D8010 * 0.01)
+            processDataList.Add(new ProcessDataParameter
+            {
+                Parameter = $"{Config.EqpNo}用水量",
+                Value = string.IsNullOrWhiteSpace(waterConsumption) ? "0" : waterConsumption.Trim()
+            });
+
+            return processDataList;
+        }
+
+        private static string ExtractTemperature(Dictionary<string, string> row)
+        {
+            if (row.TryGetValue("Col8", out string? rawTemp) && !string.IsNullOrWhiteSpace(rawTemp))
+            {
+                return rawTemp.Trim().Replace("℃", string.Empty).Trim();
+            }
+            return string.Empty;
+        }
+
+        private static (string Current, string Voltage) ParseCurrentVoltage(Dictionary<string, string> row, string columnKey)
+        {
+            if (!row.TryGetValue(columnKey, out string? rawValue) || string.IsNullOrWhiteSpace(rawValue))
+            {
+                return (string.Empty, string.Empty);
+            }
+
+            string cleaned = rawValue.Replace("A", string.Empty).Replace("V", string.Empty).Trim();
+            string[] parts = cleaned.Split('/');
+            string current = parts.Length > 0 ? parts[0].Trim() : string.Empty;
+            string voltage = parts.Length > 1 ? parts[1].Trim() : string.Empty;
+            return (current, voltage);
         }
 
         //WC 2025/10/14 Add 監控滑鼠事件，來停止 S6F1_Timer  //WC 2026/05/11 Add async/await
