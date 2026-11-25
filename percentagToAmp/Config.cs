@@ -25,6 +25,9 @@ namespace percentagToAmp
         public static string PlcIpAddress { get; private set; } = "192.168.1.2";
         public static int PlcPort { get; private set; } = 5000;
 
+        // 是否啟用 EAP 模擬測試分頁 (預設關閉以防現場誤觸)
+        public static bool EnableSimulation { get; private set; } = false;
+
         public static Dictionary<VID, List<string>> Svid_Info { get; private set; } = new Dictionary<VID, List<string>>();
 
         public static void LoadConfig(string configPath)
@@ -58,6 +61,9 @@ namespace percentagToAmp
                 if (config.PlcConnection.Port > 0)
                     PlcPort = config.PlcConnection.Port;
             }
+
+            // 模擬測試分頁顯示開關
+            EnableSimulation = config.EnableSimulation;
 
             Svid_Info.Clear();
             if (config.SvidMappings != null)
@@ -99,6 +105,7 @@ namespace percentagToAmp
 
     public class ConfigRoot
     {
+        public bool EnableSimulation { get; set; } = false;
         public ConnectionConfig Connection { get; set; }
         public PlcConnectionConfig PlcConnection { get; set; }
         public List<SvidMapping> SvidMappings { get; set; }

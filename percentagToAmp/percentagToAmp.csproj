@@ -6,9 +6,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
-    <Version>2.0.1</Version>
-    <AssemblyVersion>2.0.1</AssemblyVersion>
-    <FileVersion>2.0.1</FileVersion>
+    <Version>2.0.2</Version>
+    <AssemblyVersion>2.0.2</AssemblyVersion>
+    <FileVersion>2.0.2</FileVersion>
     <Platforms>AnyCPU;x86;x64</Platforms>
 
     <!-- Icon 與 Manifest -->
@@ -66,6 +66,12 @@
       <HintPath>..\Dll\Protocol.Drivers.Mitsubishi\System.IO.Ports.dll</HintPath>
       <Private>true</Private>
     </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="config.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

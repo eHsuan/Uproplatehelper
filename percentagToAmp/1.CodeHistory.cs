@@ -27,4 +27,5 @@ namespace HkCamer
     //2026/09/XX    WC          1.1.1.40            1.大改版 通訊變更為 MQTT，功能只剩進出站與載入Recipe，其餘功能由PLC自行處理
     //2026/11/25    WC          2.0.0               1.完善 MQTT 轉換邏輯(補齊終端訊息與失敗彈窗、主畫面即時Logs、PPSelect與S6F1互斥防呆、警報全數解除通知、進出站30秒逾時自動解鎖)並於視窗顯示 x.y.z 版本號
     //2026/11/25    WC          2.0.1               1.MQTT ProcessDataReport 改為拆解 DataGridView JSON 成 29 個中文製程參數加上用水量(共30項)上報給新版 EAP
+    //2026/11/26    WC          2.0.2               1.新增 EAP 模擬測試分頁(由 config.json EnableSimulation 控制防誤觸)與 ProcessDataReport 附加 RAWDATA 供新版 EAP 轉發 T1 看板
 }

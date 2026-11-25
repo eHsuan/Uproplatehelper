@@ -366,6 +366,168 @@
 
                 </Grid>
             </TabItem>
+            <TabItem Header="EAP 模擬測試" Visibility="{Binding SimulationTabVisibility}">
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- 第 0 列：模式控制與連線狀態 -->
+                    <Border Grid.Row="0" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,0,0,8">
+                        <DockPanel LastChildFill="True">
+                            <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                                <CheckBox Content="啟用模擬模式（跳過現場機台 UI 與 PLC）"
+                                          IsChecked="{Binding IsSimulationMode}"
+                                          FontWeight="Bold" Foreground="DarkOrange" VerticalAlignment="Center" Margin="0,0,16,0"/>
+                                <Button Content="連線 (EAP)" Command="{Binding SecsConnCommand}" Width="90" Height="28" Margin="0,0,8,0"/>
+                                <Button Content="清除 Logs" Command="{Binding ClearLogsCommand}" Width="85" Height="28"/>
+                            </StackPanel>
+                            <TextBlock Margin="16,0,0,0" Padding="8,4"
+                                       Text="{Binding ConnectionStatusText}"
+                                       TextAlignment="Center" VerticalAlignment="Center" Foreground="White">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Background" Value="Gray"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ConnectionState}" Value="NotConnected">
+                                                <Setter Property="Background" Value="Red"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding ConnectionState}" Value="Connecting">
+                                                <Setter Property="Background" Value="Gray"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding ConnectionState}" Value="PartialConnected">
+                                                <Setter Property="Background" Value="Orange"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding ConnectionState}" Value="Connected">
+                                                <Setter Property="Background" Value="Green"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </DockPanel>
+                    </Border>
+
+                    <!-- 第 1 列：製程資料上報 (ProcessDataReport) -->
+                    <GroupBox Grid.Row="1" Header="製程資料上報模擬 (ProcessDataReport - 30 項中文參數)" Padding="8" Margin="0,0,0,8">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <WrapPanel Grid.Row="0" Margin="0,0,0,6">
+                                <StackPanel Orientation="Horizontal" Margin="0,2,12,2">
+                                    <Label Content="水洗/酸洗溫度:" VerticalAlignment="Center"/>
+                                    <TextBox Text="{Binding SimWashTemp}" Width="55" Height="24" VerticalContentAlignment="Center"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,2,12,2">
+                                    <Label Content="鍍銅溫度:" VerticalAlignment="Center"/>
+                                    <TextBox Text="{Binding SimCopperTemp}" Width="55" Height="24" VerticalContentAlignment="Center"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,2,12,2">
+                                    <Label Content="A面電流:" VerticalAlignment="Center"/>
+                                    <TextBox Text="{Binding SimCurrentA}" Width="55" Height="24" VerticalContentAlignment="Center"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,2,12,2">
+                                    <Label Content="B面電流:" VerticalAlignment="Center"/>
+                                    <TextBox Text="{Binding SimCurrentB}" Width="55" Height="24" VerticalContentAlignment="Center"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,2,12,2">
+                                    <Label Content="A面電壓:" VerticalAlignment="Center"/>
+                                    <TextBox Text="{Binding SimVoltageA}" Width="55" Height="24" VerticalContentAlignment="Center"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,2,12,2">
+                                    <Label Content="B面電壓:" VerticalAlignment="Center"/>
+                                    <TextBox Text="{Binding SimVoltageB}" Width="55" Height="24" VerticalContentAlignment="Center"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,2,0,2">
+                                    <Label Content="用水量:" VerticalAlignment="Center"/>
+                                    <TextBox Text="{Binding SimWaterConsumption}" Width="55" Height="24" VerticalContentAlignment="Center"/>
+                                </StackPanel>
+                            </WrapPanel>
+                            <StackPanel Grid.Row="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Button Content="發送模擬 ProcessDataReport" Command="{Binding SimSendProcessDataCommand}" Height="28" Padding="12,0" Margin="0,0,16,0"/>
+                                <CheckBox Content="定時自動模擬上報" IsChecked="{Binding IsSimAutoReportEnabled}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <Label Content="間隔(秒):" VerticalAlignment="Center"/>
+                                <TextBox Text="{Binding SimAutoReportIntervalSec}" Width="50" Height="24" VerticalContentAlignment="Center"/>
+                            </StackPanel>
+                        </Grid>
+                    </GroupBox>
+
+                    <!-- 第 2 列：狀態變更 / 警報上報 / 進出站互動 -->
+                    <Grid Grid.Row="2" Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1*"/>
+                            <ColumnDefinition Width="1.4*"/>
+                            <ColumnDefinition Width="1.8*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- 狀態變更 -->
+                        <GroupBox Grid.Column="0" Header="狀態變更 (StatusChange)" Padding="6" Margin="0,0,6,0">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,2,0,6">
+                                    <Label Content="目標狀態:" VerticalAlignment="Center"/>
+                                    <ComboBox ItemsSource="{Binding SimStatusOptions}" SelectedItem="{Binding SimSelectedStatus}" Width="90" Height="24"/>
+                                </StackPanel>
+                                <Button Content="發送 StatusChangeReport" Command="{Binding SimSendStatusChangeCommand}" Height="28"/>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <!-- 警報上報 -->
+                        <GroupBox Grid.Column="1" Header="警報上報 (AlarmReport)" Padding="6" Margin="0,0,6,0">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,2,0,6">
+                                    <Label Content="代碼:" VerticalAlignment="Center"/>
+                                    <TextBox Text="{Binding SimAlarmCode}" Width="60" Height="24" VerticalContentAlignment="Center" Margin="0,0,6,0"/>
+                                    <Label Content="訊息:" VerticalAlignment="Center"/>
+                                    <TextBox Text="{Binding SimAlarmMessage}" Width="120" Height="24" VerticalContentAlignment="Center"/>
+                                </StackPanel>
+                                <UniformGrid Rows="1" Columns="2">
+                                    <Button Content="觸發警報 (Start)" Command="{Binding SimSendAlarmStartCommand}" Height="28" Margin="0,0,4,0"/>
+                                    <Button Content="解除警報 (End)" Command="{Binding SimSendAlarmEndCommand}" Height="28" Margin="4,0,0,0"/>
+                                </UniformGrid>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <!-- 進出站與 PP_SELECT -->
+                        <GroupBox Grid.Column="2" Header="進出站與 PP_SELECT 互動" Padding="6">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,2,0,6">
+                                    <Label Content="工單:" VerticalAlignment="Center"/>
+                                    <TextBox Text="{Binding SimWorkOrder}" Width="115" Height="24" VerticalContentAlignment="Center" Margin="0,0,4,0"/>
+                                    <Label Content="工號:" VerticalAlignment="Center"/>
+                                    <TextBox Text="{Binding SimEmployeeId}" Width="65" Height="24" VerticalContentAlignment="Center" Margin="0,0,4,0"/>
+                                    <Label Content="數量:" VerticalAlignment="Center"/>
+                                    <TextBox Text="{Binding SimTrackOutQty}" Width="40" Height="24" VerticalContentAlignment="Center"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Content="模擬進站 (TrackIn)" Command="{Binding SimSendTrackInCommand}" Height="28" Padding="8,0" Margin="0,0,6,0"/>
+                                    <Button Content="模擬出站 (TrackOut)" Command="{Binding SimSendTrackOutCommand}" Height="28" Padding="8,0" Margin="0,0,10,0"/>
+                                    <CheckBox Content="PP_SELECT 回覆 PASS" IsChecked="{Binding SimPPSelectPass}" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </GroupBox>
+                    </Grid>
+
+                    <!-- 第 3 列：即時通訊 Logs -->
+                    <GroupBox Grid.Row="3" Header="即時通訊紀錄 (Logs)" Padding="4">
+                        <ListBox ItemsSource="{Binding Logs}"
+                                 local:ListBoxAutoScrollBehavior.AutoScroll="True"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                 VirtualizingStackPanel.IsVirtualizing="True"
+                                 VirtualizingStackPanel.VirtualizationMode="Recycling">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Message}" Foreground="{Binding Color}" />
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </GroupBox>
+                </Grid>
+            </TabItem>
         </TabControl>
     </Grid>
 

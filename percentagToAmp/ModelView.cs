@@ -12,6 +12,7 @@ using Secs4Net.Sml;
 using System;
 using System;
 using System.Buffers.Text;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
@@ -972,6 +973,10 @@ namespace percentagToAmp.ViewModels
         //WC 2026/05/11 抽方法，可以先立即執行
         private async Task SendS6F1()
         {
+            // 模擬模式下不執行實體機台爬畫面與 PLC 讀取
+            if (IsSimulationMode)
+                return;
+
             // 若正在進行派送或載入配方之 UI 自動化流程，不可執行 S6F1 爬畫面
             if (!isReadyToStart || IsBusy)
                 return;
@@ -1131,6 +1136,13 @@ namespace percentagToAmp.ViewModels
                 Value = string.IsNullOrWhiteSpace(waterConsumption) ? "0" : waterConsumption.Trim()
             });
 
+            // 固定附加未拆解的 DataGridView 原始 JSON 字串，供新版 EAP 轉發給 T1 看板系統
+            processDataList.Add(new ProcessDataParameter
+            {
+                Parameter = "RAWDATA",
+                Value = rawDataGridJson ?? string.Empty
+            });
+
             return processDataList;
         }
 
@@ -1259,6 +1271,7 @@ namespace percentagToAmp.ViewModels
         private static ObservableDictionary<string, string> _S5f1AlarmInfo = new();
         private void S5F1_Timer_Elapsed(object? sender, ElapsedEventArgs e)
         {
+            if (IsSimulationMode) return; // 模擬模式下不爬警報畫面
             if (_mqtt == null || !_mqtt.IsConnected) return; //沒連上HOST就不做
 
             S5F1_Timer.Stop();
@@ -1502,60 +1515,67 @@ namespace percentagToAmp.ViewModels
                     };
 
                     //============WC 2025/11/03 派送前將載入資料重置，避免人員使用到上次紀錄的 ==========================
-                    isReadyToStart = false;
-                    S6F1_Timer.Stop();
-                    ShowOverlay();
-
-                    CyntecLog.GeneralLogger.Trace("S6F11 Send 1");
+                    if (!IsSimulationMode)
                     {
-                        CloseIfExists("數據加載");
-                        CloseIfExists("產品資料");
+                        isReadyToStart = false;
+                        S6F1_Timer.Stop();
+                        ShowOverlay();
+
+                        CyntecLog.GeneralLogger.Trace("S6F11 Send 1");
+                        {
+                            CloseIfExists("數據加載");
+                            CloseIfExists("產品資料");
+                        }
+
+                        // Activate window
+                        CyntecLog.GeneralLogger.Trace("clickDataLoad");
+                        WinAuto.clickDataLoad();
+                        Thread.Sleep(1500); //原程式本來開這頁就很久
+
+                        #region 選到第一槽 001# 上下料
+                        {
+                            string win = Utility.Svid_Info[Utility.VID.加載槽號][0]; // 或整個主視窗標題
+                            string comboId = Utility.Svid_Info[Utility.VID.加載槽號][1];// "[CLASS:WindowsForms10.COMBOBOX.app.0.34f5582_r7_ad1; INSTANCE:11]";
+
+                            AutoItX.WinActivate(win);
+                            AutoItX.WinWaitActive(win, "", 2);
+
+                            // 聚焦到 Combo
+                            AutoItX.ControlFocus(win, "", comboId);
+
+                            // 展開下拉
+                            AutoItX.ControlCommand(win, "", comboId, "ShowDropDown", "");
+
+                            // 選第一項（移到清單頂端）
+                            AutoItX.ControlSend(win, "", comboId, "{HOME}");
+                            AutoItX.ControlSend(win, "", comboId, "{ENTER}");
+                        }
+                        Thread.Sleep(500);
+                        #endregion
+
+                        // Click button
+                        SetOverlayClickThrough(true);
+                        AutoItX.ControlClick(Utility.Svid_Info[Utility.VID.清除當前][0], "", Utility.Svid_Info[Utility.VID.清除當前][1]);
+                        SetOverlayClickThrough(false);
+                        Thread.Sleep(500);
+
+                        Utility.CaptureAllScreens($"S6F11", 1);
+
+                        // Click prompt button
+                        SetOverlayClickThrough(true);
+                        AutoItX.ControlClick("提示", "", "[CLASS:Button; INSTANCE:1]"); //popout - 確定  Thread.Sleep(500);
+                        SetOverlayClickThrough(false);
+                        Thread.Sleep(1500); //PLC清除需要時間
+
+                        CyntecLog.GeneralLogger.Trace("S6F11 Send 2");
+                        {
+                            CloseIfExists("數據加載");
+                            CloseIfExists("產品資料");
+                        }
                     }
-
-                    // Activate window
-                    CyntecLog.GeneralLogger.Trace("clickDataLoad");
-                    WinAuto.clickDataLoad();
-                    Thread.Sleep(1500); //原程式本來開這頁就很久
-
-                    #region 選到第一槽 001# 上下料
+                    else
                     {
-                        string win = Utility.Svid_Info[Utility.VID.加載槽號][0]; // 或整個主視窗標題
-                        string comboId = Utility.Svid_Info[Utility.VID.加載槽號][1];// "[CLASS:WindowsForms10.COMBOBOX.app.0.34f5582_r7_ad1; INSTANCE:11]";
-
-                        AutoItX.WinActivate(win);
-                        AutoItX.WinWaitActive(win, "", 2);
-
-                        // 聚焦到 Combo
-                        AutoItX.ControlFocus(win, "", comboId);
-
-                        // 展開下拉
-                        AutoItX.ControlCommand(win, "", comboId, "ShowDropDown", "");
-
-                        // 選第一項（移到清單頂端）
-                        AutoItX.ControlSend(win, "", comboId, "{HOME}");
-                        AutoItX.ControlSend(win, "", comboId, "{ENTER}");
-                    }
-                    Thread.Sleep(500);
-                    #endregion
-
-                    // Click button
-                    SetOverlayClickThrough(true);
-                    AutoItX.ControlClick(Utility.Svid_Info[Utility.VID.清除當前][0], "", Utility.Svid_Info[Utility.VID.清除當前][1]);
-                    SetOverlayClickThrough(false);
-                    Thread.Sleep(500);
-
-                    Utility.CaptureAllScreens($"S6F11", 1);
-
-                    // Click prompt button
-                    SetOverlayClickThrough(true);
-                    AutoItX.ControlClick("提示", "", "[CLASS:Button; INSTANCE:1]"); //popout - 確定  Thread.Sleep(500);
-                    SetOverlayClickThrough(false);
-                    Thread.Sleep(1500); //PLC清除需要時間
-
-                    CyntecLog.GeneralLogger.Trace("S6F11 Send 2");
-                    {
-                        CloseIfExists("數據加載");
-                        CloseIfExists("產品資料");
+                        AddLog("[模擬-進站派送] 模擬模式跳過機台清除畫面，直接發送 TrackInReq", Brushes.DarkOrange);
                     }
                     //===========================================
 
@@ -1958,7 +1978,19 @@ namespace percentagToAmp.ViewModels
 
                     try
                     {
-                        success = LoadRecipe(e.RecipeID);
+                        if (IsSimulationMode)
+                        {
+                            success = SimPPSelectPass;
+                            if (!success)
+                            {
+                                message = $"[模擬模式] 設定為 PP_SELECT 失敗 (RecipeID={e.RecipeID})";
+                            }
+                            AddLog($"[模擬-配方載入] 跳過實體 LoadRecipe，依模擬設定回覆 {(success ? "PASS" : "FAIL")} (RecipeID={e.RecipeID})", Brushes.DarkOrange);
+                        }
+                        else
+                        {
+                            success = LoadRecipe(e.RecipeID);
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -2424,21 +2456,31 @@ namespace percentagToAmp.ViewModels
             {
                 CyntecLog.GeneralLogger.Trace($"[TimeCalibrate] BC時間校正要求. TransactionID={payload.TransactionID}, DATE={payload.DATE}");
 
-                string errorMessage = string.Empty;
-                bool success = SystemTimeHelper.SetSystemTime(payload.DATE, out errorMessage);
-
-                if (success)
+                if (IsSimulationMode)
                 {
-                    CyntecLog.GeneralLogger.Trace($"[TimeCalibrate] 系統時間設定成功，DATE={payload.DATE}");
-                    AddLog($"[時間校正] 系統時間設定成功: {payload.DATE}", Brushes.Blue);
+                    result = "PASS";
+                    message = string.Empty;
+                    CyntecLog.GeneralLogger.Trace($"[TimeCalibrate][模擬] 略過修改本機系統時間，直接回覆 PASS，DATE={payload.DATE}");
+                    AddLog($"[模擬-時間校正] 收到校正要求 DATE={payload.DATE}，已略過修改本機時間並回覆 PASS", Brushes.DarkOrange);
                 }
                 else
                 {
-                    result = "FAIL";
-                    message = string.IsNullOrEmpty(errorMessage) ? "系統時間設定失敗" : errorMessage;
+                    string errorMessage = string.Empty;
+                    bool success = SystemTimeHelper.SetSystemTime(payload.DATE, out errorMessage);
 
-                    CyntecLog.GeneralLogger.Error($"[TimeCalibrate] 系統時間設定失敗，DATE={payload.DATE}, Error={message}");
-                    AddLog($"[時間校正] 系統時間設定失敗: {message}", Brushes.Red);
+                    if (success)
+                    {
+                        CyntecLog.GeneralLogger.Trace($"[TimeCalibrate] 系統時間設定成功，DATE={payload.DATE}");
+                        AddLog($"[時間校正] 系統時間設定成功: {payload.DATE}", Brushes.Blue);
+                    }
+                    else
+                    {
+                        result = "FAIL";
+                        message = string.IsNullOrEmpty(errorMessage) ? "系統時間設定失敗" : errorMessage;
+
+                        CyntecLog.GeneralLogger.Error($"[TimeCalibrate] 系統時間設定失敗，DATE={payload.DATE}, Error={message}");
+                        AddLog($"[時間校正] 系統時間設定失敗: {message}", Brushes.Red);
+                    }
                 }
 
                 CyntecLog.GeneralLogger.Trace($"[TimeCalibrate] 時間校正完成. TransactionID={payload.TransactionID}, Result={result}, DATE={calibratedDate}");
@@ -2493,14 +2535,25 @@ namespace percentagToAmp.ViewModels
             try
             {
                 string currentStatus = string.IsNullOrEmpty(_lastReportedStatus) ? IDLE : _lastReportedStatus;
-                if (_S5f1AlarmInfo.Count > 0)
+                string alarmCode = "0";
+
+                if (IsSimulationMode)
+                {
+                    if (!_simActiveAlarms.IsEmpty)
+                    {
+                        currentStatus = ALARM;
+                        alarmCode = _simActiveAlarms.Keys.FirstOrDefault() ?? "0";
+                    }
+                }
+                else if (_S5f1AlarmInfo.Count > 0)
                 {
                     currentStatus = ALARM;
+                    alarmCode = _S5f1AlarmInfo.Keys.FirstOrDefault() ?? "0";
                 }
 
-                string alarmCode = _S5f1AlarmInfo.Count > 0 ? _S5f1AlarmInfo.Keys.FirstOrDefault() ?? "0" : "0";
                 await _mqtt.PublishStatusReqReplyAsync(payload.TransactionID, "PASS", string.Empty, currentStatus, alarmCode, payload.Machine);
-                CyntecLog.GeneralLogger.Trace($"[StatusReq] ReplyStatusReq Published TransactionID={payload.TransactionID}, CurrentStatus={currentStatus}");
+                CyntecLog.GeneralLogger.Trace($"[StatusReq] ReplyStatusReq Published TransactionID={payload.TransactionID}, CurrentStatus={currentStatus}, AlarmCode={alarmCode}");
+                AddLog($"[狀態查詢] 已回覆 StatusReq: CurrentStatus={currentStatus}, AlarmCode={alarmCode}", Brushes.Blue);
             }
             catch (Exception ex)
             {
@@ -3337,13 +3390,443 @@ namespace percentagToAmp.ViewModels
             public byte[] FileContent { get; set; }
         }
 
+        #region EAP 模擬測試
+
+        private volatile bool _isDisposed = false;
+        private System.Timers.Timer? _simProcessDataTimer;
+        private readonly SemaphoreSlim _simReportLock = new(1, 1);
+        private readonly ConcurrentDictionary<string, string> _simActiveAlarms = new();
+
+        public Visibility SimulationTabVisibility => Config.EnableSimulation ? Visibility.Visible : Visibility.Collapsed;
+
+        [ObservableProperty]
+        private bool isSimulationMode = false;
+
+        partial void OnIsSimulationModeChanged(bool value)
+        {
+            if (value)
+            {
+                AddLog("[模擬模式] 已啟用（跳過現場機台 UI 自動化與 PLC 讀取）", Brushes.DarkOrange);
+            }
+            else
+            {
+                if (IsSimAutoReportEnabled)
+                {
+                    IsSimAutoReportEnabled = false;
+                }
+                AddLog("[模擬模式] 已停用（恢復正常現場模式）", Brushes.DarkOrange);
+            }
+        }
+
+        [ObservableProperty]
+        private string simWashTemp = "24.5";
+
+        [ObservableProperty]
+        private string simCopperTemp = "24.2";
+
+        [ObservableProperty]
+        private string simCurrentA = "12.5";
+
+        [ObservableProperty]
+        private string simCurrentB = "12.3";
+
+        [ObservableProperty]
+        private string simVoltageA = "2.15";
+
+        [ObservableProperty]
+        private string simVoltageB = "2.10";
+
+        [ObservableProperty]
+        private string simWaterConsumption = "26.8";
+
+        [ObservableProperty]
+        private int simAutoReportIntervalSec = 10;
+
+        [ObservableProperty]
+        private bool isSimAutoReportEnabled = false;
+
+        partial void OnIsSimAutoReportEnabledChanged(bool value)
+        {
+            if (value)
+            {
+                if (!IsSimulationMode)
+                {
+                    IsSimulationMode = true;
+                }
+
+                int intervalSec = SimAutoReportIntervalSec < 1 ? 1 : SimAutoReportIntervalSec;
+                SimAutoReportIntervalSec = intervalSec;
+
+                if (_simProcessDataTimer != null)
+                {
+                    _simProcessDataTimer.Elapsed -= SimProcessDataTimer_Elapsed;
+                    _simProcessDataTimer.Stop();
+                    _simProcessDataTimer.Dispose();
+                }
+
+                _simProcessDataTimer = new System.Timers.Timer(intervalSec * 1000);
+                _simProcessDataTimer.Elapsed += SimProcessDataTimer_Elapsed;
+                _simProcessDataTimer.AutoReset = true;
+                _simProcessDataTimer.Start();
+
+                AddLog($"[模擬-定時上報] 已啟動（每 {intervalSec} 秒發送模擬 ProcessDataReport）", Brushes.DarkOrange);
+            }
+            else
+            {
+                _simProcessDataTimer?.Stop();
+                AddLog("[模擬-定時上報] 已停止", Brushes.DarkOrange);
+            }
+        }
+
+        private async void SimProcessDataTimer_Elapsed(object? sender, ElapsedEventArgs e)
+        {
+            if (_isDisposed)
+                return;
+
+            try
+            {
+                await SimSendProcessDataAsync();
+            }
+            catch (ObjectDisposedException)
+            {
+                // 視窗關閉釋放資源期間忽略
+            }
+            catch (Exception ex)
+            {
+                CyntecLog.GeneralLogger.Error($"[Sim][Timer] SimProcessDataTimer_Elapsed Error: {ex}");
+            }
+        }
+
+        public List<string> SimStatusOptions { get; } = new() { RUN, IDLE, ALARM };
+
+        [ObservableProperty]
+        private string simSelectedStatus = RUN;
+
+        [ObservableProperty]
+        private string simAlarmCode = "0001";
+
+        [ObservableProperty]
+        private string simAlarmMessage = "模擬測試警報";
+
+        [ObservableProperty]
+        private string simWorkOrder = "2P261125TEST01";
+
+        [ObservableProperty]
+        private string simEmployeeId = "A12345";
+
+        [ObservableProperty]
+        private string simTrackOutQty = "10";
+
+        [ObservableProperty]
+        private bool simPPSelectPass = true;
+
+        /// <summary>
+        /// 產生符合現場 DataGridView 結構的模擬 JSON，供正式 BuildProcessDataParameters() 拆解驗證。
+        /// </summary>
+        private string BuildSimulatedDataGridJson()
+        {
+            string washTemp = string.IsNullOrWhiteSpace(SimWashTemp) ? "24.5" : SimWashTemp.Trim();
+            string copperTemp = string.IsNullOrWhiteSpace(SimCopperTemp) ? "24.2" : SimCopperTemp.Trim();
+            string curA = string.IsNullOrWhiteSpace(SimCurrentA) ? "00.0" : SimCurrentA.Trim();
+            string curB = string.IsNullOrWhiteSpace(SimCurrentB) ? "00.0" : SimCurrentB.Trim();
+            string volA = string.IsNullOrWhiteSpace(SimVoltageA) ? "0.00" : SimVoltageA.Trim();
+            string volB = string.IsNullOrWhiteSpace(SimVoltageB) ? "0.00" : SimVoltageB.Trim();
+
+            var rows = new List<Dictionary<string, string>>
+            {
+                new() { ["Col1"] = "005#", ["Col8"] = $"{washTemp}℃" },
+                new() { ["Col1"] = "009#", ["Col8"] = $"{copperTemp}℃", ["Col15"] = $"{curA}A/{volA}V", ["Col17"] = $"{curB}A/{volB}V" },
+                new() { ["Col1"] = "010#", ["Col8"] = $"{copperTemp}℃", ["Col15"] = $"{curA}A/{volA}V", ["Col17"] = $"{curB}A/{volB}V" },
+                new() { ["Col1"] = "011#", ["Col8"] = $"{copperTemp}℃", ["Col15"] = $"{curA}A/{volA}V", ["Col17"] = $"{curB}A/{volB}V" },
+                new() { ["Col1"] = "012#", ["Col8"] = $"{copperTemp}℃", ["Col15"] = $"{curA}A/{volA}V", ["Col17"] = $"{curB}A/{volB}V" },
+                new() { ["Col1"] = "013#", ["Col8"] = $"{copperTemp}℃", ["Col15"] = $"{curA}A/{volA}V", ["Col17"] = $"{curB}A/{volB}V" },
+                new() { ["Col1"] = "016#", ["Col8"] = $"{washTemp}℃" },
+                new() { ["Col1"] = "019#", ["Col8"] = $"{washTemp}℃" },
+                new() { ["Col1"] = "020#", ["Col8"] = $"{washTemp}℃" }
+            };
+
+            var info = new AutoCIMDataGridInfo
+            {
+                Rtn_Result = "TRUE",
+                Rtn_Value = rows
+            };
+
+            return JsonConvert.SerializeObject(info);
+        }
+
+        [RelayCommand]
+        private async Task SimSendProcessDataAsync()
+        {
+            if (_isDisposed)
+                return;
+
+            if (_mqtt == null || !_mqtt.IsConnected)
+            {
+                AddLog("[模擬-ProcessData] 發送失敗: MQTT 未連線", Brushes.Red);
+                return;
+            }
+
+            bool lockTaken = false;
+            try
+            {
+                lockTaken = await _simReportLock.WaitAsync(0);
+                if (!lockTaken)
+                    return;
+
+                string simJson = BuildSimulatedDataGridJson();
+                string water = string.IsNullOrWhiteSpace(SimWaterConsumption) ? "0" : SimWaterConsumption.Trim();
+                var processDataList = BuildProcessDataParameters(simJson, water);
+
+                var processDataReq = new ProcessDataReportRequest
+                {
+                    TransactionID = Guid.NewGuid().ToString(),
+                    CMD = MqttCommands.ProcessDataReport,
+                    DATE = DateTime.Now.ToString("yyyyMMddHHmmss"),
+                    Machine = Config.EqpNo,
+                    ProcessData = processDataList
+                };
+
+                await _mqtt.PublishReportAsync(processDataReq);
+                CyntecLog.GeneralLogger.Trace($"[Sim][ProcessDataReport] Published TransactionID={processDataReq.TransactionID}, ParamCount={processDataList.Count}");
+                AddLog($"[模擬-ProcessData] 已發送 {processDataList.Count} 項參數 (含 RAWDATA, 用水量={water}, TxID={processDataReq.TransactionID[..8]})", Brushes.Green);
+            }
+            catch (ObjectDisposedException)
+            {
+                // 視窗關閉釋放資源期間忽略
+            }
+            catch (Exception ex)
+            {
+                CyntecLog.GeneralLogger.Error($"[Sim][ProcessDataReport] Error: {ex}");
+                AddLog($"[模擬-ProcessData] 發送異常: {ex.Message}", Brushes.Red);
+            }
+            finally
+            {
+                if (lockTaken)
+                {
+                    try
+                    {
+                        _simReportLock.Release();
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        // 釋放過程中鎖已 Dispose 則忽略
+                    }
+                }
+            }
+        }
+
+        [RelayCommand]
+        private async Task SimSendStatusChangeAsync()
+        {
+            if (_mqtt == null || !_mqtt.IsConnected)
+            {
+                AddLog("[模擬-狀態變更] 發送失敗: MQTT 未連線", Brushes.Red);
+                return;
+            }
+
+            try
+            {
+                string oldStatus = string.IsNullOrEmpty(_lastReportedStatus) ? IDLE : _lastReportedStatus;
+                string newStatus = string.IsNullOrWhiteSpace(SimSelectedStatus) ? IDLE : SimSelectedStatus.Trim();
+                _lastReportedStatus = newStatus;
+
+                var statusReq = new StatusChangeReportRequest
+                {
+                    TransactionID = Guid.NewGuid().ToString(),
+                    CMD = MqttCommands.StatusChangeReport,
+                    DATE = DateTime.Now.ToString("yyyyMMddHHmmss"),
+                    Machine = Config.EqpNo,
+                    OldStatus = oldStatus,
+                    NewStatus = newStatus
+                };
+
+                await _mqtt.PublishReportAsync(statusReq);
+                CyntecLog.GeneralLogger.Trace($"[Sim][StatusChangeReport] Published Old={oldStatus}, New={newStatus}, TxID={statusReq.TransactionID}");
+                AddLog($"[模擬-狀態變更] 已發送 StatusChangeReport: {oldStatus} -> {newStatus}", Brushes.Green);
+            }
+            catch (Exception ex)
+            {
+                CyntecLog.GeneralLogger.Error($"[Sim][StatusChangeReport] Error: {ex}");
+                AddLog($"[模擬-狀態變更] 發送異常: {ex.Message}", Brushes.Red);
+            }
+        }
+
+        [RelayCommand]
+        private async Task SimSendAlarmStartAsync()
+        {
+            await SendSimulatedAlarmAsync("Start");
+        }
+
+        [RelayCommand]
+        private async Task SimSendAlarmEndAsync()
+        {
+            await SendSimulatedAlarmAsync("End");
+        }
+
+        private async Task SendSimulatedAlarmAsync(string alarmStatus)
+        {
+            if (_mqtt == null || !_mqtt.IsConnected)
+            {
+                AddLog($"[模擬-警報{alarmStatus}] 發送失敗: MQTT 未連線", Brushes.Red);
+                return;
+            }
+
+            try
+            {
+                string code = string.IsNullOrWhiteSpace(SimAlarmCode) ? "0001" : SimAlarmCode.Trim();
+                string msg = string.IsNullOrWhiteSpace(SimAlarmMessage) ? "模擬測試警報" : SimAlarmMessage.Trim();
+
+                if (alarmStatus == "Start")
+                {
+                    _simActiveAlarms[code] = msg;
+                }
+                else
+                {
+                    _simActiveAlarms.TryRemove(code, out _);
+                }
+
+                var alarmReq = new AlarmReportRequest
+                {
+                    TransactionID = Guid.NewGuid().ToString(),
+                    CMD = MqttCommands.AlarmReport,
+                    DATE = DateTime.Now.ToString("yyyyMMddHHmmss"),
+                    Machine = Config.EqpNo,
+                    AlarmStatus = alarmStatus,
+                    AlarmCode = code,
+                    AlarmMsg = msg,
+                    AlarmType = "A"
+                };
+
+                await _mqtt.PublishReportAsync(alarmReq);
+                CyntecLog.GeneralLogger.Trace($"[Sim][AlarmReport] Published Status={alarmStatus}, Code={code}, Msg={msg}");
+                AddLog($"[模擬-警報上報] 已發送 AlarmReport ({alarmStatus}): Code={code}, Msg={msg}", alarmStatus == "Start" ? Brushes.OrangeRed : Brushes.Green);
+            }
+            catch (Exception ex)
+            {
+                CyntecLog.GeneralLogger.Error($"[Sim][AlarmReport] Error: {ex}");
+                AddLog($"[模擬-警報上報] 發送異常: {ex.Message}", Brushes.Red);
+            }
+        }
+
+        [RelayCommand]
+        private async Task SimSendTrackInAsync()
+        {
+            if (_mqtt == null || !_mqtt.IsConnected || !_mqtt.IsMesAlive)
+            {
+                AddLog("[模擬-進站] 發送失敗: MQTT / EAP 未連線", Brushes.Red);
+                return;
+            }
+
+            if (!IsSimulationMode)
+            {
+                IsSimulationMode = true;
+            }
+
+            string wo = string.IsNullOrWhiteSpace(SimWorkOrder) ? "2P261125TEST01" : SimWorkOrder.Trim();
+            string uid = string.IsNullOrWhiteSpace(SimEmployeeId) ? "A12345" : SimEmployeeId.Trim();
+
+            try
+            {
+                var request = new TrackInRequest
+                {
+                    TransactionID = Guid.NewGuid().ToString(),
+                    CMD = MqttCommands.TrackInReq,
+                    DATE = DateTime.Now.ToString("yyyyMMddHHmmss"),
+                    Machine = Config.EqpNo,
+                    WorkOrder = wo,
+                    UserID = uid
+                };
+
+                _activeTrackInTxId = request.TransactionID;
+                await _mqtt.PublishReportAsync(request);
+                CyntecLog.GeneralLogger.Trace($"[Sim][TrackInReq] Published TxID={request.TransactionID}, WorkOrder={wo}, UserID={uid}");
+                AddLog($"[模擬-進站] 已發送 TrackInReq: 工單={wo}, 工號={uid} (PP_SELECT模擬={(SimPPSelectPass ? "PASS" : "FAIL")})", Brushes.Blue);
+                StartTrackInTimeoutWatcher(request.TransactionID, wo);
+            }
+            catch (Exception ex)
+            {
+                _activeTrackInTxId = string.Empty;
+                CyntecLog.GeneralLogger.Error($"[Sim][TrackInReq] Error: {ex}");
+                AddLog($"[模擬-進站] 發送異常: {ex.Message}", Brushes.Red);
+            }
+        }
+
+        [RelayCommand]
+        private async Task SimSendTrackOutAsync()
+        {
+            if (_mqtt == null || !_mqtt.IsConnected || !_mqtt.IsMesAlive)
+            {
+                AddLog("[模擬-出站] 發送失敗: MQTT / EAP 未連線", Brushes.Red);
+                return;
+            }
+
+            if (!IsSimulationMode)
+            {
+                IsSimulationMode = true;
+            }
+
+            string wo = string.IsNullOrWhiteSpace(SimWorkOrder) ? "2P261125TEST01" : SimWorkOrder.Trim();
+            string uid = string.IsNullOrWhiteSpace(SimEmployeeId) ? "A12345" : SimEmployeeId.Trim();
+            string qty = string.IsNullOrWhiteSpace(SimTrackOutQty) ? "0" : SimTrackOutQty.Trim();
+
+            try
+            {
+                var request = new TrackOutRequest
+                {
+                    TransactionID = Guid.NewGuid().ToString(),
+                    CMD = MqttCommands.TrackOutReq,
+                    DATE = DateTime.Now.ToString("yyyyMMddHHmmss"),
+                    Machine = Config.EqpNo,
+                    WorkOrder = new List<string> { wo },
+                    UserID = uid,
+                    Qty = qty
+                };
+
+                _activeTrackOutTxId = request.TransactionID;
+                await _mqtt.PublishReportAsync(request);
+                CyntecLog.GeneralLogger.Trace($"[Sim][TrackOutReq] Published TxID={request.TransactionID}, WorkOrder={wo}, UserID={uid}, Qty={qty}");
+                AddLog($"[模擬-出站] 已發送 TrackOutReq: 工單={wo}, 工號={uid}, 數量={qty}", Brushes.Blue);
+                StartTrackOutTimeoutWatcher(request.TransactionID, wo);
+            }
+            catch (Exception ex)
+            {
+                _activeTrackOutTxId = string.Empty;
+                CyntecLog.GeneralLogger.Error($"[Sim][TrackOutReq] Error: {ex}");
+                AddLog($"[模擬-出站] 發送異常: {ex.Message}", Brushes.Red);
+            }
+        }
+
+        [RelayCommand]
+        private void ClearLogs()
+        {
+            if (Application.Current?.Dispatcher != null && !Application.Current.Dispatcher.CheckAccess())
+            {
+                Application.Current.Dispatcher.Invoke(() => Logs.Clear());
+            }
+            else
+            {
+                Logs.Clear();
+            }
+        }
+
+        #endregion
+
         public void Dispose()
         {
+            _isDisposed = true;
             Debug.WriteLine("XXX");
             S5F1_Timer?.Stop();
             S5F1_Timer?.Dispose();
             S6F1_Timer?.Stop();
             S6F1_Timer?.Dispose();
+            if (_simProcessDataTimer != null)
+            {
+                _simProcessDataTimer.Elapsed -= SimProcessDataTimer_Elapsed;
+                _simProcessDataTimer.Stop();
+                _simProcessDataTimer.Dispose();
+                _simProcessDataTimer = null;
+            }
+            _simReportLock?.Dispose();
         }
         public class AutoCIMResponse
         {

@@ -1,10 +1,11 @@
 {
+	"EnableSimulation": false,
 	"Connection": {
 		"IpAddress": "127.0.0.1",
 		"Port": 1883,
 		"Factory": "TN2",
 		"Floor": "Floor2",
-		"Area": "Yellow",
+		"Area": "YELLOW",
 		"EqpNo": "PL0084"
 	},
 	"PlcConnection": {
