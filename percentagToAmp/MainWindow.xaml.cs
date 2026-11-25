@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Data;
 using System.Diagnostics;
@@ -27,12 +27,14 @@ namespace percentagToAmp
         public MainWindow()
         {
             InitializeComponent();
-            this.Title += $" {FileVersionInfo.GetVersionInfo(Assembly.GetExecutingAssembly().Location).FileVersion}";
+            var ver = Assembly.GetExecutingAssembly().GetName().Version;
+            string versionText = ver != null ? $"{ver.Major}.{ver.Minor}.{Math.Max(0, ver.Build)}" : "1.0.0";
+            this.Title += $" {versionText}";
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
             CyntecLog.GeneralLogger.Info("uPro外掛啟動");
+            Config.LoadConfig("config.json");
             mvm = new ViewModels.mainModelView();
             DataContext = mvm;
-            Config.LoadConfig("config.json");
 
             {
                 mvm.LoadDBToGD();

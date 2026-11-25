@@ -915,45 +915,42 @@ namespace percentagToAmp.ViewModels
             });
         }
 
+        private string _lastReportedStatus = string.Empty;
+
         public mainModelView()
         {
             // 初次驗證（可選）
             ValidateAllProperties();
-            //S5F1_Timer = new System.Timers.Timer();
-            //S5F1_Timer.Interval = 1000 * 1;
-            //S5F1_Timer.Elapsed += S5F1_Timer_Elapsed;
-            //S5F1_Timer.Start();
+            this._S2f23SvidInfo = new List<string> { "1021", "1022" };
+            isReadyToStart = true;
 
-            //// 初始化滑鼠位置
-            //GetCursorPos(out lastMousePos);
-            //lastMouseMoveTime = DateTime.Now;
+            S5F1_Timer = new System.Timers.Timer();
+            S5F1_Timer.Interval = 1000 * 3;
+            S5F1_Timer.Elapsed += S5F1_Timer_Elapsed;
+            S5F1_Timer.Start();
 
-            //// 每秒檢查滑鼠
-            //S6F1_CheckTimer = new System.Timers.Timer(1000);
-            //S6F1_CheckTimer.Elapsed += S6F1_CheckTimer_Elapsed;
-            //S6F1_CheckTimer.AutoReset = true;
-            //S6F1_CheckTimer.Start();
+            // 初始化滑鼠位置
+            GetCursorPos(out lastMousePos);
+            lastMouseMoveTime = DateTime.Now;
 
-            //S6F1_Timer = new System.Timers.Timer();
-            //S6F1_Timer.Elapsed += S6F1_Timer_Elapsed;
+            // 每秒檢查滑鼠
+            S6F1_CheckTimer = new System.Timers.Timer(1000);
+            S6F1_CheckTimer.Elapsed += S6F1_CheckTimer_Elapsed;
+            S6F1_CheckTimer.AutoReset = true;
+            S6F1_CheckTimer.Start();
 
-            //this._logger = (ISecsGemLogger)new SecsLogger(this, CyntecLog.SecsLogger);
-            //_S5f1AlarmInfo.OnChanged += _S5f1AlarmInfo_OnChanged;
+            S6F1_Timer = new System.Timers.Timer(60000);
+            S6F1_Timer.Elapsed += S6F1_Timer_Elapsed;
+            S6F1_Timer.AutoReset = true;
+            S6F1_Timer.Start();
 
-            //MitsubishiPLC.Initialize();     //WC 2026/05/07 Add Mitsubishi PLC 初始化
+            this._logger = (ISecsGemLogger)new SecsLogger(this, CyntecLog.SecsLogger);
+            _S5f1AlarmInfo.OnChanged += _S5f1AlarmInfo_OnChanged;
 
             ConnectedTimer = new System.Timers.Timer(1000);
             ConnectedTimer.Elapsed += ConnectedTimer_Elapsed;
             ConnectedTimer.AutoReset = true;
             ConnectedTimer.Start();
-
-            //WC 測試
-            // HMI / PLC 負責資料處理
-            // PC 只負責：
-            // 1. MQTT 通訊
-            // 2. 自動進出站
-            // 3. 自動切換 Recipe
-
         }
 
         //WC 2026/05/11 抽方法
@@ -975,61 +972,90 @@ namespace percentagToAmp.ViewModels
         //WC 2026/05/11 抽方法，可以先立即執行
         private async Task SendS6F1()
         {
+            // 若正在進行派送或載入配方之 UI 自動化流程，不可執行 S6F1 爬畫面
+            if (!isReadyToStart || IsBusy)
+                return;
+
             // 已有執行中的 S6F1
             if (!await S6F1Lock.WaitAsync(0))
                 return;
 
             try
             {
-                // 沒連線不送
-                if (_secsGem == null || _connector == null || _connector.State != Secs4Net.ConnectionState.Selected)
+                if (!isReadyToStart || IsBusy)
+                    return;
+
+                // 沒連線不送 (改為檢查 MQTT 連線狀態)
+                if (_mqtt == null || !_mqtt.IsConnected)
                     return;
 
                 if (this._S2f23SvidInfo.Count <= 0)
-                    return;
-
-                var vidMsg_Info = GetS1F3MachineValue(this._S2f23SvidInfo);
-
-                Item[] objArray = new Item[vidMsg_Info.Count];
-
-                for (int index = 0; index < vidMsg_Info.Count; ++index)
                 {
-                    var dataGridBye = new DataGridByteInfo
-                    {
-                        // UTF8 編碼
-                        FileContent = Encoding.UTF8.GetBytes(vidMsg_Info[index])    //SECS 的世界只有ASCII 要傳中文只能先編碼
-                    };
-
-                    objArray[index] = Item.A(JsonConvert.SerializeObject(dataGridBye));
+                    this._S2f23SvidInfo = new List<string> { "1021", "1022" };
                 }
 
-                //WC 測試 解碼用
-                //byte[] bytes = Convert.FromBase64String(FileContent);
-                //string ce = Encoding.UTF8.GetString(bytes);
+                var vidMsg_Info = GetS1F3MachineValue(this._S2f23SvidInfo);
+                if (vidMsg_Info == null || vidMsg_Info.Count <= 0)
+                    return;
 
-                var secsMsg = new SecsMessage(6, 1)
+                // GetS1F3MachineValue 回傳順序：
+                // [0] = 1022 DataGridView JSON
+                // [1] = 1021 機台狀態 ("RUN" / "IDLE" / "ALARM")
+                // [2] = PLC D8010 用水量 (Water_Consumption)
+                string rawDataGridJson = vidMsg_Info.Count > 0 ? vidMsg_Info[0] : string.Empty;
+                string machineStatus = vidMsg_Info.Count > 1 ? vidMsg_Info[1] : IDLE;
+                string waterConsumption = vidMsg_Info.Count > 2 ? vidMsg_Info[2] : "0";
+
+                if (_S5f1AlarmInfo.Count > 0 && string.IsNullOrEmpty(machineStatus))
                 {
-                    Name = string.Empty,
-                    SecsItem = Item.L(
-                        Item.A(this._S2f23RptId),
-                        Item.A("0"),
-                        Item.A(DateTime.Now.ToString("yyyyMMddHHmmssffff")),
-                        Item.L(objArray))
+                    machineStatus = ALARM;
+                }
+                else if (string.IsNullOrEmpty(machineStatus))
+                {
+                    machineStatus = IDLE;
+                }
+
+                // 若機台狀態有變化，主動發送 StatusChangeReport
+                if (!string.Equals(_lastReportedStatus, machineStatus, StringComparison.OrdinalIgnoreCase))
+                {
+                    string oldStatus = string.IsNullOrEmpty(_lastReportedStatus) ? IDLE : _lastReportedStatus;
+                    _lastReportedStatus = machineStatus;
+
+                    var statusReq = new StatusChangeReportRequest
+                    {
+                        TransactionID = Guid.NewGuid().ToString(),
+                        CMD = MqttCommands.StatusChangeReport,
+                        DATE = DateTime.Now.ToString("yyyyMMddHHmmss"),
+                        Machine = Config.EqpNo,
+                        OldStatus = oldStatus,
+                        NewStatus = machineStatus
+                    };
+                    await _mqtt.PublishReportAsync(statusReq);
+                    CyntecLog.GeneralLogger.Trace($"[TraceData] StatusChangeReport Published Old={oldStatus}, New={machineStatus}");
+                }
+
+                var processDataList = new List<ProcessDataParameter>
+                {
+                    new ProcessDataParameter { Parameter = "1022", Value = rawDataGridJson },
+                    new ProcessDataParameter { Parameter = "1021", Value = machineStatus },
+                    new ProcessDataParameter { Parameter = "1046", Value = waterConsumption }
                 };
 
-                // 等待送出完成
-                await _secsGem.SendAsync(
-                    secsMsg,
-                    this._cancellationTokenSource.Token);
+                var processDataReq = new ProcessDataReportRequest
+                {
+                    TransactionID = Guid.NewGuid().ToString(),
+                    CMD = MqttCommands.ProcessDataReport,
+                    DATE = DateTime.Now.ToString("yyyyMMddHHmmss"),
+                    Machine = Config.EqpNo,
+                    ProcessData = processDataList
+                };
+
+                await _mqtt.PublishReportAsync(processDataReq);
+                CyntecLog.GeneralLogger.Trace($"[TraceData] ProcessDataReport Published TransactionID={processDataReq.TransactionID}, Status={machineStatus}, Water={waterConsumption}");
             }
             catch (OperationCanceledException)
             {
                 // Task 被取消
-            }
-            catch (SecsException ex)
-            {
-                // SECS/GEM 異常              
-                CyntecLog.GeneralLogger.Error($"SendS6F1 SECS Error : {ex}");
             }
             catch (Exception ex)
             {
@@ -1097,34 +1123,46 @@ namespace percentagToAmp.ViewModels
             }));          
         }
 
-        private void _S5f1AlarmInfo_OnChanged(string action, string key, string value)
+        private async void _S5f1AlarmInfo_OnChanged(string action, string key, string value)
         {
             CyntecLog.GeneralLogger.Debug($"動作: {action}, Key={key}, Value={value}");
-            string name = string.Empty;
-            name = $"AlarmReport";
-            var dataGridBye = new DataGridByteInfo
-            {
-                FileContent = Encoding.UTF8.GetBytes(value)
-            };
-            if (action == "Add" || action == "Update")
-            {
-                //應該永遠不會有 Update 除非 Alarm description 於 Runtime 中有變動
-                var secsMsg = new SecsMessage(5, 1)
-                {
-                    Name = name,
-                    SecsItem = Item.L(Item.A("Y"), Item.A(key), Item.A(JsonConvert.SerializeObject(dataGridBye)))
-                };
-                _ = _secsGem?.SendAsync(secsMsg, _cancellationTokenSource.Token);
-            }
-            else if (action == "Remove")
-            {
+            if (_mqtt == null || !_mqtt.IsConnected)
+                return;
 
-                var secsMsg = new SecsMessage(5, 1)
+            try
+            {
+                string alarmStatus = string.Empty;
+                if (action == "Add" || action == "Update")
                 {
-                    Name = name,
-                    SecsItem = Item.L(Item.A("N"), Item.A(key), Item.A(JsonConvert.SerializeObject(dataGridBye)))
+                    alarmStatus = "1";
+                }
+                else if (action == "Remove")
+                {
+                    alarmStatus = "0";
+                }
+                else
+                {
+                    return;
+                }
+
+                var alarmReq = new AlarmReportRequest
+                {
+                    TransactionID = Guid.NewGuid().ToString(),
+                    CMD = MqttCommands.AlarmReport,
+                    DATE = DateTime.Now.ToString("yyyyMMddHHmmss"),
+                    Machine = Config.EqpNo,
+                    AlarmStatus = alarmStatus,
+                    AlarmCode = key,
+                    AlarmMsg = value ?? string.Empty
                 };
-                _ = _secsGem?.SendAsync(secsMsg, _cancellationTokenSource.Token);
+
+                await _mqtt.PublishReportAsync(alarmReq);
+                CyntecLog.GeneralLogger.Trace($"[Alarm] AlarmReport Published TransactionID={alarmReq.TransactionID}, Action={action}, Code={key}, Status={alarmStatus}");
+                AddLog($"[警報上報] 狀態={(alarmStatus == "1" ? "發生" : "解除")}, 代碼={key}, 訊息={value}", alarmStatus == "1" ? Brushes.Red : Brushes.Green);
+            }
+            catch (Exception ex)
+            {
+                CyntecLog.GeneralLogger.Error($"_S5f1AlarmInfo_OnChanged Error: {ex}");
             }
         }
 
@@ -1132,7 +1170,7 @@ namespace percentagToAmp.ViewModels
         private static ObservableDictionary<string, string> _S5f1AlarmInfo = new();
         private void S5F1_Timer_Elapsed(object? sender, ElapsedEventArgs e)
         {
-            if (_secsGem == null || _connector == null || _connector.State != Secs4Net.ConnectionState.Selected) return; //沒連上HOST就不做
+            if (_mqtt == null || !_mqtt.IsConnected) return; //沒連上HOST就不做
 
             S5F1_Timer.Stop();
             try
@@ -1178,8 +1216,89 @@ namespace percentagToAmp.ViewModels
 
         private void AddCore(string msg, Brush color)
         {
-            Logs.Add(new LogItem { Message = msg, Color = color });
+            string timestampedMsg = $"[{DateTime.Now:HH:mm:ss}] {msg}";
+            Logs.Add(new LogItem { Message = timestampedMsg, Color = color });
             if (Logs.Count > MaxLines) Logs.RemoveAt(0);
+        }
+
+        private void ShowMessageBoxWindow(string message)
+        {
+            if (string.IsNullOrWhiteSpace(message))
+                message = "異常發生";
+
+            if (Application.Current == null)
+                return;
+
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                try
+                {
+                    if (_messageBoxWindow == null || !_messageBoxWindow.IsVisible)
+                    {
+                        _messageBoxWindow = new MessageBoxWindow();
+                    }
+                    _messageBoxWindow.UpdateMessage(message);
+                }
+                catch (Exception ex)
+                {
+                    CyntecLog.GeneralLogger.Error($"ShowMessageBoxWindow Error: {ex}");
+                }
+            });
+        }
+
+        private string _activeTrackInTxId = string.Empty;
+        private string _activeTrackOutTxId = string.Empty;
+        private const int MqttReplyTimeoutMs = 30000;
+
+        private async void StartTrackInTimeoutWatcher(string txId, string lotId)
+        {
+            try
+            {
+                await Task.Delay(MqttReplyTimeoutMs, _cts.Token);
+                if (IsBusy && string.Equals(_activeTrackInTxId, txId, StringComparison.Ordinal))
+                {
+                    _activeTrackInTxId = string.Empty;
+                    IsBusy = false;
+                    isReadyToStart = true;
+                    HideOverlay();
+                    string timeoutMsg = $"工單 {lotId} 進站等待 EAP 回覆逾時 ({MqttReplyTimeoutMs / 1000}秒)";
+                    CyntecLog.GeneralLogger.Warn($"[MoveIn] {timeoutMsg}, TransactionID={txId}");
+                    AddLog(timeoutMsg, Brushes.Red);
+                    ShowMessageBoxWindow(timeoutMsg);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception ex)
+            {
+                CyntecLog.GeneralLogger.Error($"StartTrackInTimeoutWatcher Error: {ex}");
+            }
+        }
+
+        private async void StartTrackOutTimeoutWatcher(string txId, string workOrder)
+        {
+            try
+            {
+                await Task.Delay(MqttReplyTimeoutMs, _cts.Token);
+                if (IsBusyMoveOut && string.Equals(_activeTrackOutTxId, txId, StringComparison.Ordinal))
+                {
+                    _activeTrackOutTxId = string.Empty;
+                    SetIsBusyMoveOut(false);
+                    HideOverlay();
+                    string timeoutMsg = $"工單 {workOrder} 出站等待 EAP 回覆逾時 ({MqttReplyTimeoutMs / 1000}秒)";
+                    CyntecLog.GeneralLogger.Warn($"[MoveOut] {timeoutMsg}, TransactionID={txId}");
+                    AddLog(timeoutMsg, Brushes.Red);
+                    ShowMessageBoxWindow(timeoutMsg);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception ex)
+            {
+                CyntecLog.GeneralLogger.Error($"StartTrackOutTimeoutWatcher Error: {ex}");
+            }
         }
 
         // 當屬性改變時做即時驗證
@@ -1250,6 +1369,7 @@ namespace percentagToAmp.ViewModels
             ValidateAllProperties();
             if (DispatchHasErrors) return;
 
+            bool published = false;
             try
             {
                 IsBusy = true;
@@ -1272,6 +1392,7 @@ namespace percentagToAmp.ViewModels
                 // 檢查 MQTT / EAP 連線狀態
                 if (_mqtt == null || !_mqtt.IsConnected || !_mqtt.IsMesAlive)
                 {
+                    AddLog("派送失敗: MQTT / EAP 未連線", Brushes.Red);
                     return;
                 }
 
@@ -1292,6 +1413,8 @@ namespace percentagToAmp.ViewModels
                     };
 
                     //============WC 2025/11/03 派送前將載入資料重置，避免人員使用到上次紀錄的 ==========================
+                    isReadyToStart = false;
+                    S6F1_Timer.Stop();
                     ShowOverlay();
 
                     CyntecLog.GeneralLogger.Trace("S6F11 Send 1");
@@ -1369,9 +1492,13 @@ namespace percentagToAmp.ViewModels
                         UserID = userId
                     };
 
+                    _activeTrackInTxId = request.TransactionID;
                     await _mqtt.PublishReportAsync(request);
+                    published = true;
 
                     CyntecLog.GeneralLogger.Trace($"[MoveIn] TrackInReq Published TransactionID={request.TransactionID}, WorkOrder={lotId}, UserID={userId}");
+                    AddLog($"[進站派送] 已發送進站請求: 工單={lotId}, 工號={userId}", Brushes.Blue);
+                    StartTrackInTimeoutWatcher(request.TransactionID, lotId);
 
                     // ========================================
                     // 注意：
@@ -1383,24 +1510,28 @@ namespace percentagToAmp.ViewModels
                 }
                 catch (SecsException ex)
                 {
-                    //CyntecLog.SecsLogger.Error(ex);
-                    //MainForm.CyntecLog.GeneralLogger.WriteLog($"派工傳送 Command 流程異常! 原因【{ex}】");
+                    CyntecLog.GeneralLogger.Error($"DispatchAsync SecsException: {ex}");
+                    AddLog($"派送流程異常: {ex.Message}", Brushes.Red);
                 }
             }
             catch (OperationCanceledException ex)
             {
-                //CyntecLog.SecsLogger.Error(ex);
-                // 被取消
+                CyntecLog.GeneralLogger.Warn($"DispatchAsync Canceled: {ex.Message}");
             }
             catch (Exception ex)
             {
-               // CyntecLog.SecsLogger.Error(ex);
-                //MainForm.CyntecLog.GeneralLogger.WriteLog($"派工按鈕流程異常! 原因【{ex}】");
+                CyntecLog.GeneralLogger.Error($"DispatchAsync Exception: {ex}");
+                AddLog($"派送流程異常: {ex.Message}", Brushes.Red);
             }
             finally
             {
-                //IsBusy = false;
-                //HideOverlay();  //WC 2025/11/03 Add   
+                if (!published)
+                {
+                    _activeTrackInTxId = string.Empty;
+                    IsBusy = false;
+                    isReadyToStart = true;
+                    HideOverlay();
+                }
             }
         }
 
@@ -1411,6 +1542,7 @@ namespace percentagToAmp.ViewModels
             ValidateAllProperties();
             if (MoveOutHasErrors) return;
 
+            bool published = false;
             try
             {              
                 SetIsBusyMoveOut(true);
@@ -1429,6 +1561,7 @@ namespace percentagToAmp.ViewModels
                 // 檢查 MQTT / EAP 連線狀態
                 if (_mqtt == null || !_mqtt.IsConnected || !_mqtt.IsMesAlive)
                 {
+                    AddLog("出站失敗: MQTT / EAP 未連線", Brushes.Red);
                     return;
                 }
 
@@ -1503,9 +1636,13 @@ namespace percentagToAmp.ViewModels
                         Qty = "0"   //default 0
                     };
 
+                    _activeTrackOutTxId = request.TransactionID;
                     await _mqtt.PublishReportAsync(request);
+                    published = true;
 
                     CyntecLog.GeneralLogger.Trace($"[MoveOut] TrackOutReq Published TransactionID={request.TransactionID}, WorkOrder={workOrder}, UserID={userId}");
+                    AddLog($"[工單出站] 已發送出站請求: 工單={workOrder}, 工號={userId}", Brushes.Blue);
+                    StartTrackOutTimeoutWatcher(request.TransactionID, workOrder);
 
                     // ========================================
                     // 注意：
@@ -1537,7 +1674,7 @@ namespace percentagToAmp.ViewModels
                 catch (SecsException ex)
                 {
                     CyntecLog.SecsLogger.Error(ex);
-
+                    AddLog($"出站流程異常: {ex.Message}", Brushes.Red);
                 }
             }
             catch (OperationCanceledException ex)
@@ -1548,12 +1685,16 @@ namespace percentagToAmp.ViewModels
             catch (Exception ex)
             {
                 CyntecLog.SecsLogger.Error(ex);
+                AddLog($"出站流程異常: {ex.Message}", Brushes.Red);
             }
             finally
             {
-                //WC 2025/12/29 由 S6F11 移至 S10F3 才結束 Move Out 忙碌狀態  
-                //IsBusyMoveOut = false;
-                //HideOverlay();  //WC 2025/11/03 Add                       
+                if (!published)
+                {
+                    _activeTrackOutTxId = string.Empty;
+                    SetIsBusyMoveOut(false);
+                    HideOverlay();
+                }
             }
         }
 
@@ -1609,11 +1750,12 @@ namespace percentagToAmp.ViewModels
                     _mqtt.ReplyReceived += MqttService_ReplyReceived;
                     _mqtt.MessageError += MqttService_MessageError;                   
                     _mqtt.TimeCalibrateReceived += HandleTimeCalibrateAsync;
-                    //_mqtt.StatusReqReceived += HandleStatusReqAsync; 狀態由 HMI 直接回覆，不經過 PC
+                    _mqtt.StatusReqReceived += HandleStatusReqAsync;
                     _mqtt.TerminalDisplayReceived += HandleTerminalDisplayAsync;                
                     _mqtt.LogLevel = LogLevel.Info;                  
                 }
 
+                MitsubishiPLC.Initialize();
                 await _mqtt.ConnectAsync();
             }
             catch (Exception ex)
@@ -1712,12 +1854,14 @@ namespace percentagToAmp.ViewModels
             try
             {
                 CyntecLog.GeneralLogger.Trace($"[MQTT] PPSelect Start TransactionID={e.TransactionID}, RecipeID={e.RecipeID}");
+                AddLog($"[配方載入] 收到 EAP PPSelect 指令, RecipeID={e.RecipeID}", Brushes.Blue);
 
                 if (string.IsNullOrWhiteSpace(e.RecipeID))
                 {
                     message = "RecipeID is empty.";
 
                     CyntecLog.GeneralLogger.Error($"[MQTT] PPSelect Failed TransactionID={e.TransactionID}, Reason={message}");
+                    AddLog($"[配方載入] 失敗: {message}", Brushes.Red);
                 }
                 else
                 {
@@ -1740,6 +1884,7 @@ namespace percentagToAmp.ViewModels
                         message = $"Recipe [{e.RecipeID}] selected successfully.";
                         CyntecLog.GeneralLogger.Trace($"[MQTT] PPSelect Success TransactionID={e.TransactionID}, RecipeID={e.RecipeID}");
                         CyntecLog.GeneralLogger.Trace($"載入 Recipe 成功. Recipe No:{e.RecipeID}");
+                        AddLog($"[配方載入] 載入 Recipe 成功. Recipe No: {e.RecipeID}", Brushes.Blue);
                     }
                     else
                     {
@@ -1750,6 +1895,7 @@ namespace percentagToAmp.ViewModels
 
                         CyntecLog.GeneralLogger.Error($"[MQTT] PPSelect Failed TransactionID={e.TransactionID}, RecipeID={e.RecipeID}, Message={message}");
                         CyntecLog.GeneralLogger.Trace($"載入 Recipe 失敗. Recipe No:{e.RecipeID}");
+                        AddLog($"[配方載入] 載入 Recipe 失敗. Recipe No: {e.RecipeID}, 原因: {message}", Brushes.Red);
                     }
                 }
 
@@ -1787,7 +1933,8 @@ namespace percentagToAmp.ViewModels
 
         private bool LoadRecipe(string recipe)
         {
-            //isReadyToStart = false; //WC 2026/06/23 Add 防呆，以防還在運行中，觸發S6F1
+            isReadyToStart = false; //WC 2026/06/23 Add 防呆，以防還在運行中，觸發S6F1
+            S6F1_Timer.Stop();
             bool 成功設定 = false;
             var 資料編號 = recipe;
             var 批號 = workOrderNo; // 直接抓 UI 上的，後續流程 MoveIn >> PP Select >> LoadRecipe >> MoveIn OK
@@ -1992,17 +2139,13 @@ namespace percentagToAmp.ViewModels
                                 HandleEventReportReply(payload);
                                 break;
 
-                            //case MqttCommands.ReplyTimeCalibrate:
-                            //    HandleTimeCalibrateReply(payload);
-                            //    break;
+                            case MqttCommands.ReplyRtnTraceData:
+                                CyntecLog.GeneralLogger.Trace($"[MQTT] RtnTraceData Reply Result={payload.RtnResult}, TransactionID={payload.TransactionID}");
+                                break;
 
-                            //case MqttCommands.ReplyProcessDataReport:
-                            //    HandleProcessDataReportReply(payload);
-                            //    break;
-
-                            //case MqttCommands.ReplyRtnTraceData:
-                            //    HandleRtnTraceDataReply(payload);
-                            //    break;
+                            case MqttCommands.ReplyProcessDataReport:
+                                CyntecLog.GeneralLogger.Trace($"[MQTT] ProcessDataReport Reply Result={payload.RtnResult}, TransactionID={payload.TransactionID}");
+                                break;
 
                             default:
                                 CyntecLog.GeneralLogger.Error($"[MQTT] Unknown Reply CMD={payload.CMD}, TransactionID={payload.TransactionID}");
@@ -2023,6 +2166,8 @@ namespace percentagToAmp.ViewModels
 
         private void HandleTrackInReply(MqttCommandPayload payload)
         {
+            _activeTrackInTxId = string.Empty;
+
             if (string.Equals(payload.RtnResult, "PASS", StringComparison.OrdinalIgnoreCase))
             {
                 CyntecLog.GeneralLogger.Trace($"[MQTT] TrackIn PASS TransactionID={payload.TransactionID}");
@@ -2037,30 +2182,41 @@ namespace percentagToAmp.ViewModels
                 //}               
 
                 CyntecLog.GeneralLogger.Trace($"{WorkOrderNo} 工單進站成功.");
+                AddLog($"[進站結果] {WorkOrderNo} 工單進站成功.", Brushes.Blue);
             }
             else
             {
                 CyntecLog.GeneralLogger.Error($"[MQTT] TrackIn FAIL TransactionID={payload.TransactionID}, Message={payload.RtnMsg}");
                 // 更新 TrackIn 失敗狀態
-                CyntecLog.GeneralLogger.Trace($"{WorkOrderNo} 工單進站失敗. Message={payload.RtnMsg}");
+                string failMsg = $"{WorkOrderNo} 工單進站失敗. Message={payload.RtnMsg}";
+                CyntecLog.GeneralLogger.Trace(failMsg);
+                AddLog($"[進站結果] {failMsg}", Brushes.Red);
+                ShowMessageBoxWindow(failMsg);
                 //TrackInWorkOrder = string.Empty;
             }
 
             IsBusy = false;
+            isReadyToStart = true;
             HideOverlay();
         }
 
         private void HandleTrackOutReply(MqttCommandPayload payload)
         {
+            _activeTrackOutTxId = string.Empty;
+
             if (string.Equals(payload.RtnResult, "PASS", StringComparison.OrdinalIgnoreCase))
             {
                 CyntecLog.GeneralLogger.Trace($"[MQTT] TrackOut PASS TransactionID={payload.TransactionID}");
                 CyntecLog.GeneralLogger.Trace($"{WorkOrderNoMoveOut} 工單出站成功.");
+                AddLog($"[出站結果] {WorkOrderNoMoveOut} 工單出站成功.", Brushes.Blue);
             }
             else
             {
                 CyntecLog.GeneralLogger.Error($"[MQTT] TrackOut FAIL TransactionID={payload.TransactionID}, Message={payload.RtnMsg}");
-                CyntecLog.GeneralLogger.Trace($"{WorkOrderNoMoveOut} 工單出站失敗. Message={payload.RtnMsg}");
+                string failMsg = $"{WorkOrderNoMoveOut} 工單出站失敗. Message={payload.RtnMsg}";
+                CyntecLog.GeneralLogger.Trace(failMsg);
+                AddLog($"[出站結果] {failMsg}", Brushes.Red);
+                ShowMessageBoxWindow(failMsg);
             }
 
 
@@ -2185,6 +2341,7 @@ namespace percentagToAmp.ViewModels
                 if (success)
                 {
                     CyntecLog.GeneralLogger.Trace($"[TimeCalibrate] 系統時間設定成功，DATE={payload.DATE}");
+                    AddLog($"[時間校正] 系統時間設定成功: {payload.DATE}", Brushes.Blue);
                 }
                 else
                 {
@@ -2192,6 +2349,7 @@ namespace percentagToAmp.ViewModels
                     message = string.IsNullOrEmpty(errorMessage) ? "系統時間設定失敗" : errorMessage;
 
                     CyntecLog.GeneralLogger.Error($"[TimeCalibrate] 系統時間設定失敗，DATE={payload.DATE}, Error={message}");
+                    AddLog($"[時間校正] 系統時間設定失敗: {message}", Brushes.Red);
                 }
 
                 CyntecLog.GeneralLogger.Trace($"[TimeCalibrate] 時間校正完成. TransactionID={payload.TransactionID}, Result={result}, DATE={calibratedDate}");
@@ -2202,6 +2360,7 @@ namespace percentagToAmp.ViewModels
                 message = ex.Message;
 
                 CyntecLog.GeneralLogger.Error($"[TimeCalibrate] 時間校正失敗. TransactionID={payload.TransactionID}, Error={ex}");
+                AddLog($"[時間校正] 時間校正例外: {ex.Message}", Brushes.Red);
             }
 
             await _mqtt.PublishTimeCalibrateReplyAsync(payload.TransactionID, result, message, payload.Machine);
@@ -2220,13 +2379,10 @@ namespace percentagToAmp.ViewModels
                     $"DATE={payload.DATE}, " +
                     $"Message={payload.Message}");
 
-                // TODO: 實際顯示訊息              
-                CyntecLog.GeneralLogger.Trace($"EAP訊息顯示 [{payload.Message}]");
-
-                //CyntecLog.GeneralLogger.Trace(
-                //    $"[TerminalDisplay] 訊息顯示完成. " +
-                //    $"TransactionID={payload.TransactionID}, " +
-                //    $"Message={payload.Message}");
+                string displayMsg = string.IsNullOrWhiteSpace(payload.Message) ? "異常發生" : payload.Message;
+                CyntecLog.GeneralLogger.Trace($"EAP訊息顯示 [{displayMsg}]");
+                AddLog($"[EAP訊息] {displayMsg}", Brushes.Red);
+                ShowMessageBoxWindow(displayMsg);
             }
             catch (Exception ex)
             {
@@ -2241,6 +2397,26 @@ namespace percentagToAmp.ViewModels
 
             // 回覆 BC
             await _mqtt.PublishTerminalDisplayReplyAsync(payload.TransactionID, result, message);
+        }
+
+        private async Task HandleStatusReqAsync(MqttCommandPayload payload)
+        {
+            try
+            {
+                string currentStatus = string.IsNullOrEmpty(_lastReportedStatus) ? IDLE : _lastReportedStatus;
+                if (_S5f1AlarmInfo.Count > 0)
+                {
+                    currentStatus = ALARM;
+                }
+
+                string alarmCode = _S5f1AlarmInfo.Count > 0 ? _S5f1AlarmInfo.Keys.FirstOrDefault() ?? "0" : "0";
+                await _mqtt.PublishStatusReqReplyAsync(payload.TransactionID, "PASS", string.Empty, currentStatus, alarmCode, payload.Machine);
+                CyntecLog.GeneralLogger.Trace($"[StatusReq] ReplyStatusReq Published TransactionID={payload.TransactionID}, CurrentStatus={currentStatus}");
+            }
+            catch (Exception ex)
+            {
+                CyntecLog.GeneralLogger.Error($"[StatusReq] HandleStatusReqAsync Error: {ex}");
+            }
         }
 
         //[RelayCommand(CanExecute = nameof(CanSecsConn))]
@@ -2612,6 +2788,8 @@ namespace percentagToAmp.ViewModels
         [ObservableProperty]
         eConnectionState connectionState = eConnectionState.Connecting;
 
+        private eConnectionState _lastLoggedConnectionState = eConnectionState.Connecting;
+
         private void UpdateConnectionState()
         {
             if (_mqtt == null)            
@@ -2636,6 +2814,18 @@ namespace percentagToAmp.ViewModels
             {
                 ConnectionState = eConnectionState.NotConnected;
                 ConnectionStatusText = "MQTT / EAP: 未連線";
+            }
+
+            if (_lastLoggedConnectionState != ConnectionState)
+            {
+                _lastLoggedConnectionState = ConnectionState;
+                Brush logColor = ConnectionState switch
+                {
+                    eConnectionState.Connected => Brushes.Green,
+                    eConnectionState.PartialConnected => Brushes.Orange,
+                    _ => Brushes.Red
+                };
+                AddLog($"[連線狀態] {ConnectionStatusText}", logColor);
             }
 
             DispatchCommand.NotifyCanExecuteChanged();
@@ -3132,12 +3322,15 @@ namespace percentagToAmp.ViewModels
                 return (SyncResult.Skipped, rtnMsg);
 
             }
-            // 沒資料（只有表頭或完全無列）→ 清空
+            // 沒資料（只有表頭或完全無列）→ 逐筆移除以觸發 Remove 通知並發送 AlarmStatus = "0"
             if (rtnValue.Count <= 1)
             {
                 if (_S5f1AlarmInfo.Count > 0)
                 {
-                    _S5f1AlarmInfo.Clear();   // 會觸發 Clear
+                    foreach (var existingId in _S5f1AlarmInfo.Keys.ToList())
+                    {
+                        _S5f1AlarmInfo.Remove(existingId);
+                    }
                     return (SyncResult.Cleared, "no alarm");
                 }
                 return (SyncResult.NoChange, "no alarm");
