@@ -1026,17 +1026,20 @@ namespace percentagToAmp.ViewModels
                     string oldStatus = string.IsNullOrEmpty(_lastReportedStatus) ? IDLE : _lastReportedStatus;
                     _lastReportedStatus = machineStatus;
 
+                    string oldStatusCode = ConvertToEapStatusCode(oldStatus);
+                    string newStatusCode = ConvertToEapStatusCode(machineStatus);
+
                     var statusReq = new StatusChangeReportRequest
                     {
                         TransactionID = Guid.NewGuid().ToString(),
                         CMD = MqttCommands.StatusChangeReport,
                         DATE = DateTime.Now.ToString("yyyyMMddHHmmss"),
                         Machine = Config.EqpNo,
-                        OldStatus = oldStatus,
-                        NewStatus = machineStatus
+                        OldStatus = oldStatusCode,
+                        NewStatus = newStatusCode
                     };
                     await _mqtt.PublishReportAsync(statusReq);
-                    CyntecLog.GeneralLogger.Trace($"[TraceData] StatusChangeReport Published Old={oldStatus}, New={machineStatus}");
+                    CyntecLog.GeneralLogger.Trace($"[TraceData] StatusChangeReport Published Old={oldStatus}({oldStatusCode}), New={machineStatus}({newStatusCode})");
                 }
 
                 var processDataList = BuildProcessDataParameters(rawDataGridJson, waterConsumption);
@@ -2551,9 +2554,10 @@ namespace percentagToAmp.ViewModels
                     alarmCode = _S5f1AlarmInfo.Keys.FirstOrDefault() ?? "0";
                 }
 
-                await _mqtt.PublishStatusReqReplyAsync(payload.TransactionID, "PASS", string.Empty, currentStatus, alarmCode, payload.Machine);
-                CyntecLog.GeneralLogger.Trace($"[StatusReq] ReplyStatusReq Published TransactionID={payload.TransactionID}, CurrentStatus={currentStatus}, AlarmCode={alarmCode}");
-                AddLog($"[狀態查詢] 已回覆 StatusReq: CurrentStatus={currentStatus}, AlarmCode={alarmCode}", Brushes.Blue);
+                string currentStatusCode = ConvertToEapStatusCode(currentStatus);
+                await _mqtt.PublishStatusReqReplyAsync(payload.TransactionID, "PASS", string.Empty, currentStatusCode, alarmCode, payload.Machine);
+                CyntecLog.GeneralLogger.Trace($"[StatusReq] ReplyStatusReq Published TransactionID={payload.TransactionID}, CurrentStatus={currentStatus}({currentStatusCode}), AlarmCode={alarmCode}");
+                AddLog($"[狀態查詢] 已回覆 StatusReq: CurrentStatus={currentStatus}({currentStatusCode}), AlarmCode={alarmCode}", Brushes.Blue);
             }
             catch (Exception ex)
             {
@@ -3070,6 +3074,26 @@ namespace percentagToAmp.ViewModels
         private static readonly string IDLE = "IDLE";
         private static readonly string ALARM = "ALARM";
         private static readonly string RUN = "RUN";
+        private static readonly string DOWN = "DOWN";
+
+        /// <summary>
+        /// 將機台內部狀態轉換為 EAP status_light_map 燈號狀態碼：
+        /// RUN -> "0" (自動運行)、ALARM -> "1" (異常警報)、IDLE -> "3" (待機閒置)、DOWN -> "10" (停機)，預設 "3"。
+        /// </summary>
+        private static string ConvertToEapStatusCode(string? status)
+        {
+            if (string.IsNullOrWhiteSpace(status))
+                return "3";
+
+            return status.Trim().ToUpperInvariant() switch
+            {
+                "RUN" or "RUNNING" or "0" => "0",
+                "ALARM" or "1" => "1",
+                "IDLE" or "3" => "3",
+                "DOWN" or "10" => "10",
+                _ => "3"
+            };
+        }
         public static List<string> GetS1F3MachineValue(List<string> Svid_Info)
         {
             KeyValuePair<bool, string> keyValuePair = new KeyValuePair<bool, string>();
@@ -3497,7 +3521,7 @@ namespace percentagToAmp.ViewModels
             }
         }
 
-        public List<string> SimStatusOptions { get; } = new() { RUN, IDLE, ALARM };
+        public List<string> SimStatusOptions { get; } = new() { RUN, IDLE, ALARM, DOWN };
 
         [ObservableProperty]
         private string simSelectedStatus = RUN;
@@ -3630,19 +3654,22 @@ namespace percentagToAmp.ViewModels
                 string newStatus = string.IsNullOrWhiteSpace(SimSelectedStatus) ? IDLE : SimSelectedStatus.Trim();
                 _lastReportedStatus = newStatus;
 
+                string oldStatusCode = ConvertToEapStatusCode(oldStatus);
+                string newStatusCode = ConvertToEapStatusCode(newStatus);
+
                 var statusReq = new StatusChangeReportRequest
                 {
                     TransactionID = Guid.NewGuid().ToString(),
                     CMD = MqttCommands.StatusChangeReport,
                     DATE = DateTime.Now.ToString("yyyyMMddHHmmss"),
                     Machine = Config.EqpNo,
-                    OldStatus = oldStatus,
-                    NewStatus = newStatus
+                    OldStatus = oldStatusCode,
+                    NewStatus = newStatusCode
                 };
 
                 await _mqtt.PublishReportAsync(statusReq);
-                CyntecLog.GeneralLogger.Trace($"[Sim][StatusChangeReport] Published Old={oldStatus}, New={newStatus}, TxID={statusReq.TransactionID}");
-                AddLog($"[模擬-狀態變更] 已發送 StatusChangeReport: {oldStatus} -> {newStatus}", Brushes.Green);
+                CyntecLog.GeneralLogger.Trace($"[Sim][StatusChangeReport] Published Old={oldStatus}({oldStatusCode}), New={newStatus}({newStatusCode}), TxID={statusReq.TransactionID}");
+                AddLog($"[模擬-狀態變更] 已發送 StatusChangeReport: {oldStatus}({oldStatusCode}) -> {newStatus}({newStatusCode})", Brushes.Green);
             }
             catch (Exception ex)
             {
